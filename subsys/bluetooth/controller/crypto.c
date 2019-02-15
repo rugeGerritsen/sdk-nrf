@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include <soc.h>
 #include <ble_controller_soc.h>
+#include <random/rand32.h>
 
 #include "nrf_errno.h"
 #include "multithreading_lock.h"

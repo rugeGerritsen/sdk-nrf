@@ -241,11 +241,6 @@ static int hci_driver_open(void)
 			NULL, NULL, NULL, K_PRIO_COOP(CONFIG_BLECTLR_PRIO), 0,
 			K_NO_WAIT);
 
-	k_thread_create(&signal_thread_data, signal_thread_stack,
-			K_THREAD_STACK_SIZEOF(signal_thread_stack),
-			signal_thread, NULL, NULL, NULL,
-			K_PRIO_COOP(CONFIG_BLECTLR_PRIO), 0, K_NO_WAIT);
-
 	return 0;
 }
 
@@ -370,6 +365,18 @@ static int ble_init(void)
 	if (err < 0) {
 		return err;
 	}
+
+	/* Start processing software interrupts. This enables, e.g., the flash
+	 * API to work without having to call bt_enable(), which in turn calls
+	 * hci_driver_open().
+	 *
+	 * FIXME: Here we possibly start dynamic behavior during initialization,
+	 * which in general is a bad thing.
+	 */
+	k_thread_create(&signal_thread_data, signal_thread_stack,
+			K_THREAD_STACK_SIZEOF(signal_thread_stack),
+			signal_thread, NULL, NULL, NULL,
+			K_PRIO_COOP(CONFIG_BLECTLR_PRIO), 0, K_NO_WAIT);
 
 	return 0;
 }

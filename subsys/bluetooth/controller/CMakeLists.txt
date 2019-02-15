@@ -18,4 +18,8 @@ zephyr_library_sources_ifdef(
   crypto.c
 )
 
+zephyr_library_sources_ifdef(
+  CONFIG_SOC_FLASH_NRF_LL_NRFXLIB
+  flash_driver.c)
+
 zephyr_library_link_libraries(subsys__bluetooth)
