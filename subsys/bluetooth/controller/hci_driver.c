@@ -9,6 +9,7 @@
 #include <irq.h>
 #include <kernel.h>
 #include <soc.h>
+#include <misc/byteorder.h>
 
 #include <ble_controller.h>
 #include <ble_controller_hci.h>
@@ -260,6 +261,26 @@ void host_signal(void)
 void SIGNALLING_Handler(void)
 {
 	k_sem_give(&sem_signal);
+}
+
+uint8_t bt_read_static_addr(bt_addr_le_t *addr)
+{
+	if (((NRF_FICR->DEVICEADDR[0] != UINT32_MAX) ||
+		((NRF_FICR->DEVICEADDR[1] & UINT16_MAX) != UINT16_MAX)) &&
+		 (NRF_FICR->DEVICEADDRTYPE & 0x01)) {
+		sys_put_le32(NRF_FICR->DEVICEADDR[0], &addr->a.val[0]);
+		sys_put_le16(NRF_FICR->DEVICEADDR[1], &addr->a.val[4]);
+
+		/* The FICR value is a just a random number, with no knowledge
+		 * of the Bluetooth Specification requirements for random
+		 * static addresses.
+		 */
+		BT_ADDR_SET_STATIC(&addr->a);
+
+		addr->type = BT_ADDR_LE_RANDOM;
+		return 1;
+	}
+	return 0;
 }
 
 static int ble_init(void)
