@@ -1,7 +1,6 @@
 // Due to JENKINS-42369 we put these defines outside the pipeline
-def IMAGE_TAG = "ncs-toolchain:1.06"
-def REPO_ZEPHYR = "https://github.com/NordicPlayground/fw-nrfconnect-zephyr.git"
-def REPO_NRFXLIB = "https://github.com/NordicPlayground/nrfxlib.git"
+def IMAGE_TAG = "ncs-toolchain:1.07"
+def REPO_CI_TOOLS = "https://github.com/zephyrproject-rtos/ci-tools.git"
 
 // Function to get the current repo URL, to be propagated to the downstream job
 def getRepoURL() {
@@ -28,6 +27,7 @@ pipeline {
     docker {
       image "$IMAGE_TAG"
       label "docker && ncs"
+      args '-e PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/workdir/.local/bin'
     }
   }
   options {
@@ -36,8 +36,14 @@ pipeline {
   }
 
   environment {
+      // ENVs for check-compliance
+      GH_TOKEN = credentials('nordicbuilder-compliance-token') // This token is used to by check_compliance to comment on PRs and use checks
+      GH_USERNAME = "NordicBuilder"
+      COMPLIANCE_ARGS = "-r NordicPlayground/fw-nrfconnect-nrf"
+      COMPLIANCE_REPORT_ARGS = "-p $CHANGE_ID -S $GIT_COMMIT -g"
+
       // Build all custom samples that match the ci_build tag
-      SANITYCHECK_OPTIONS = "--board-root $WORKSPACE/nrf/boards --testcase-root $WORKSPACE/nrf/samples --build-only --disable-unrecognized-section-test -t ci_build --inline-logs"
+      SANITYCHECK_OPTIONS = "--board-root $WORKSPACE/nrf/boards --testcase-root $WORKSPACE/nrf/samples --testcase-root $WORKSPACE/nrf/applications --build-only --disable-unrecognized-section-test -t ci_build --inline-logs"
       ARCH = "-a arm"
       LC_ALL = "C.UTF-8"
 
@@ -52,12 +58,16 @@ pipeline {
   stages {
     stage('Checkout repositories') {
       steps {
-        dir("zephyr") {
-          git branch: "nrf91", url: "$REPO_ZEPHYR", credentialsId: 'github'
+        // Fetch the tools used to checking compliance
+        dir("ci-tools") {
+          git branch: "master", url: "$REPO_CI_TOOLS"
         }
-        dir("nrfxlib") {
-          git branch: "master", url: "$REPO_NRFXLIB", credentialsId: 'github'
-        }
+        // Install and initialize west
+        sh "pip3 install --user west==0.5.1"
+        sh "west init -l nrf/"
+
+        // Checkout
+        sh "west update"
       }
     }
 
@@ -79,15 +89,30 @@ pipeline {
               for(int i=0; i<desktop_platforms.size(); i++) {
                 file_path = "zephyr/sanity-out/${desktop_platforms[i]}/nrf_desktop/test/zephyr/zephyr.hex"
                 check_and_store_sample("$file_path", "nrf_desktop_${desktop_platforms[i]}.hex")
+                file_path = "zephyr/sanity-out/${desktop_platforms[i]}/nrf_desktop/test_zrelease/zephyr/zephyr.hex"
+                check_and_store_sample("$file_path", "nrf_desktop_${desktop_platforms[i]}_ZRelease.hex")
               }
 
               /* Rename the nrf9160 samples */
-              samples = ['secure_boot', 'asset_tracker', 'lte_ble_gateway', 'at_client']
+              samples = ['secure_boot']
               for(int i=0; i<samples.size(); i++)
               {
                 file_path = "zephyr/sanity-out/nrf9160_pca10090/nrf9160/${samples[i]}/test_build/zephyr/zephyr.hex"
                 check_and_store_sample("$file_path", "${samples[i]}_nrf9160_pca10090.hex")
               }
+              ns_samples = ['lte_ble_gateway', 'at_client']
+              for(int i=0; i<ns_samples.size(); i++)
+              {
+                file_path = "zephyr/sanity-out/nrf9160_pca10090ns/nrf9160/${ns_samples[i]}/test_build/zephyr/zephyr.hex"
+                check_and_store_sample("$file_path", "${ns_samples[i]}_nrf9160_pca10090ns.hex")
+              }
+	      ns_apps = ['asset_tracker']
+              for(int i=0; i<ns_apps.size(); i++)
+              {
+                file_path = "zephyr/sanity-out/nrf9160_pca10090ns/${ns_apps[i]}/test_build/zephyr/zephyr.hex"
+                check_and_store_sample("$file_path", "${ns_apps[i]}_nrf9160_pca10090ns.hex")
+              }
+
             }
             archiveArtifacts allowEmptyArchive: true, artifacts: 'artifacts/*.hex'
           }
@@ -96,21 +121,25 @@ pipeline {
         stage('Run compliance check') {
           steps {
             // Define a Groovy script block, which allows things like try/catch and if/else. If not, the junit command will not be run if check-compliance fails
-            script {
-              // If we're a pull request, compare the target branch against the current HEAD (the PR)
-              if (env.CHANGE_TARGET) {
-                COMMIT_RANGE = "origin/${env.CHANGE_TARGET}..HEAD"
-              }
-              // If not a PR, it's a non-PR-branch or master build. Compare against the origin.
-              else {
-                COMMIT_RANGE = "origin/${env.BRANCH_NAME}..HEAD"
-              }
-              // Run the compliance check
-              try {
-                sh "(source zephyr/zephyr-env.sh && cd nrf && ../zephyr/scripts/ci/check-compliance.py --commits $COMMIT_RANGE)"
-              }
-              finally {
-                junit 'nrf/compliance.xml'
+            dir('nrf') {
+              script {
+                // If we're a pull request, compare the target branch against the current HEAD (the PR), and also report issues to the PR
+                if (env.CHANGE_TARGET) {
+                  COMMIT_RANGE = "origin/${env.CHANGE_TARGET}..HEAD"
+                  COMPLIANCE_ARGS = "$COMPLIANCE_ARGS $COMPLIANCE_REPORT_ARGS"
+                }
+                // If not a PR, it's a non-PR-branch or master build. Compare against the origin.
+                else {
+                  COMMIT_RANGE = "origin/${env.BRANCH_NAME}..HEAD"
+                }
+                // Run the compliance check
+                try {
+                  sh "(source ../zephyr/zephyr-env.sh && ../ci-tools/scripts/check_compliance.py $COMPLIANCE_ARGS --commits $COMMIT_RANGE)"
+                }
+                finally {
+                  junit 'compliance.xml'
+                  archiveArtifacts artifacts: 'compliance.xml'
+                }
               }
             }
           }

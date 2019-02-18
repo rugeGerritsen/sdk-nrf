@@ -44,10 +44,41 @@ comment "BLE Advertising"
 
 config DESKTOP_BLE_ADVERTISING_ENABLE
 	bool "Enable BLE advertising"
-	default n
 	depends on BT_PERIPHERAL
 	help
 	  Make device discoverable via BLE.
+
+config DESKTOP_BLE_FAST_ADV
+	bool "Enable period of fast advertising"
+	depends on DESKTOP_BLE_ADVERTISING_ENABLE
+	help
+	  Device will initially advertise with shorter interval.
+
+config DESKTOP_BLE_SWIFT_PAIR
+	bool "Enable Swift Pair feature"
+	depends on DESKTOP_BLE_ADVERTISING_ENABLE
+	depends on DESKTOP_BLE_FAST_ADV
+	help
+	  Enable quick pairing with Microsoft Swift Pair.
+
+config DESKTOP_BLE_FAST_ADV_TIMEOUT
+	int "Time of initial fastest advertising"
+	default 30
+	depends on DESKTOP_BLE_FAST_ADV
+	help
+	  Device will initially advertise with shorter interval to enable
+	  quickest discovery by Swift Pair hosts. After this time it will shift
+	  to normal cadence advertising.
+
+config DESKTOP_BLE_SWIFT_PAIR_GRACE_PERIOD
+	int "No Swift Pair timegap before suspend"
+	default 30
+	depends on DESKTOP_POWER_MANAGER_ENABLE
+	depends on DESKTOP_BLE_SWIFT_PAIR
+	help
+	  To ensure users will not try to connect to a device which is no longer
+	  available, Swift Pair vendor section will be removed before exiting
+	  from advertising mode.
 
 if DESKTOP_BLE_ADVERTISING_ENABLE
 
@@ -69,16 +100,17 @@ config DESKTOP_BLE_SCANNING_ENABLE
 
 if DESKTOP_BLE_SCANNING_ENABLE
 
-config DESKTOP_BLE_SCANNING_DEVICE_NAME
-	string "Peripheral device name"
-	default ""
-	help
-	  Name of the device to which central shall connect to.
-
 module = DESKTOP_BLE_SCANNING
 module-str = BLE scanning
 source "subsys/logging/Kconfig.template.log_config"
 
 endif
+
+config DESKTOP_BLE_SHORT_NAME
+	string "Short device name used for advertising and as a scan filter"
+	default ""
+	help
+	  Name of the device to which central shall connect to. Used also to
+	  determine shortened device name for advertising.
 
 endmenu

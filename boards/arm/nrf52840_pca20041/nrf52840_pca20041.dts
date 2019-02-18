@@ -19,6 +19,7 @@
 #endif
 		zephyr,sram = &sram0;
 		zephyr,flash = &flash0;
+		zephyr,code-partition = &slot0_partition;
 	};
 };
 
@@ -116,12 +117,10 @@
 			reg = <0x000de000 0x0001e000>;
 		};
 
-#if defined(CONFIG_FS_FLASH_STORAGE_PARTITION)
 		storage_partition: partition@fc000 {
 			label = "storage";
 			reg = <0x000fc000 0x00004000>;
 		};
-#endif
 	};
 };
 

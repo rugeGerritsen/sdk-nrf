@@ -81,83 +81,83 @@ config CLOCK_CONTROL_NRF_LL_NRFXLIB
   bool "Nordic BLE controller clock control driver"
 	default y
 
-config CLOCK_CONTROL_NRF5_M16SRC_DRV_NAME
+config CLOCK_CONTROL_NRF_M16SRC_DRV_NAME
 	string "NRF5 16MHz clock device name"
 	default "clk_m16src"
 
-config CLOCK_CONTROL_NRF5_K32SRC_DRV_NAME
+config CLOCK_CONTROL_NRF_K32SRC_DRV_NAME
 	string "NRF5 32KHz clock device name"
 	default "clk_k32src"
 
-choice CLOCK_CONTROL_NR5_SOURCE
+choice CLOCK_CONTROL_NRF_SOURCE
 	prompt "32KHz clock source"
-	default CLOCK_CONTROL_NRF5_K32SRC_XTAL
+	default CLOCK_CONTROL_NRF_K32SRC_XTAL
 
-config CLOCK_CONTROL_NRF5_K32SRC_RC
+config CLOCK_CONTROL_NRF_K32SRC_RC
 	bool "RC Oscillator"
 
-config CLOCK_CONTROL_NRF5_K32SRC_XTAL
+config CLOCK_CONTROL_NRF_K32SRC_XTAL
 	bool "Crystal Oscillator"
 
-config CLOCK_CONTROL_NRF5_K32SRC_SYNTH
+config CLOCK_CONTROL_NRF_K32SRC_SYNTH
 	bool "Synthesized from HFCLK"
 
 endchoice
 
-config CLOCK_CONTROL_NRF5_K32SRC_BLOCKING
+config CLOCK_CONTROL_NRF_K32SRC_BLOCKING
 	bool "Blocking 32KHz crystal oscillator startup"
-	depends on CLOCK_CONTROL_NRF5_K32SRC_XTAL
+	depends on CLOCK_CONTROL_NRF_K32SRC_XTAL
 	help
 	  Clock control driver will spin wait in CPU sleep until 32KHz
 	  crystal oscillator starts up. If not enabled, RC oscillator will
 	  initially start running and automatically switch to crystal when
 	  ready.
 
-choice CLOCK_CONTROL_NR5_ACCURACY
+choice CLOCK_CONTROL_NRF_ACCURACY
 	prompt "32KHz clock accuracy"
-	default CLOCK_CONTROL_NRF5_K32SRC_500PPM if CLOCK_CONTROL_NRF5_K32SRC_RC
-	default CLOCK_CONTROL_NRF5_K32SRC_20PPM
+	default CLOCK_CONTROL_NRF_K32SRC_500PPM if CLOCK_CONTROL_NRF_K32SRC_RC
+	default CLOCK_CONTROL_NRF_K32SRC_20PPM
 
-config CLOCK_CONTROL_NRF5_K32SRC_500PPM
+config CLOCK_CONTROL_NRF_K32SRC_500PPM
 	bool "251 ppm to 500 ppm"
 
-config CLOCK_CONTROL_NRF5_K32SRC_250PPM
+config CLOCK_CONTROL_NRF_K32SRC_250PPM
 	bool "151 ppm to 250 ppm"
 
-config CLOCK_CONTROL_NRF5_K32SRC_150PPM
+config CLOCK_CONTROL_NRF_K32SRC_150PPM
 	bool "101 ppm to 150 ppm"
 
-config CLOCK_CONTROL_NRF5_K32SRC_100PPM
+config CLOCK_CONTROL_NRF_K32SRC_100PPM
 	bool "76 ppm to 100 ppm"
 
-config CLOCK_CONTROL_NRF5_K32SRC_75PPM
+config CLOCK_CONTROL_NRF_K32SRC_75PPM
 	bool "51 ppm to 75 ppm"
 
-config CLOCK_CONTROL_NRF5_K32SRC_50PPM
+config CLOCK_CONTROL_NRF_K32SRC_50PPM
 	bool "31 ppm to 50 ppm"
 
-config CLOCK_CONTROL_NRF5_K32SRC_30PPM
+config CLOCK_CONTROL_NRF_K32SRC_30PPM
 	bool "21 ppm to 30 ppm"
 
-config CLOCK_CONTROL_NRF5_K32SRC_20PPM
+config CLOCK_CONTROL_NRF_K32SRC_20PPM
 	bool "0 ppm to 20 ppm"
 
-config CLOCK_CONTROL_NRF5_K32SRC_10PPM
+config CLOCK_CONTROL_NRF_K32SRC_10PPM
 	bool "6 ppm to 10 ppm"
 
-config CLOCK_CONTROL_NRF5_K32SRC_5PPM
+config CLOCK_CONTROL_NRF_K32SRC_5PPM
 	bool "3 ppm to 5 ppm"
 
-config CLOCK_CONTROL_NRF5_K32SRC_2PPM
+config CLOCK_CONTROL_NRF_K32SRC_2PPM
 	bool "2 ppm"
 
-config CLOCK_CONTROL_NRF5_K32SRC_1PPM
+config CLOCK_CONTROL_NRF_K32SRC_1PPM
 	bool "1 ppm"
 
 endchoice
 
 
-config ENTROPY_NRF5_PRI
+config ENTROPY_NRF_PRI
 	int "RNG interrupt priority"
 	range 0 2 if SOC_SERIES_NRF51X
 	range 0 5 if SOC_COMPATIBLE_NRF52X

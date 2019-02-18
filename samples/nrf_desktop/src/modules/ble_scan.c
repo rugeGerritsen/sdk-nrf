@@ -21,9 +21,8 @@
 LOG_MODULE_REGISTER(MODULE, CONFIG_DESKTOP_BLE_SCANNING_LOG_LEVEL);
 
 
-#define DEVICE_NAME	CONFIG_DESKTOP_BLE_SCANNING_DEVICE_NAME
+#define DEVICE_NAME	CONFIG_DESKTOP_BLE_SHORT_NAME
 #define DEVICE_NAME_LEN	(sizeof(DEVICE_NAME) - 1)
-
 
 static bt_addr_le_t target_addr;
 
@@ -81,13 +80,6 @@ static int enable_settings(void)
 			LOG_ERR("Cannot register settings handler (err %d)", err);
 			goto error;
 		}
-
-		err = settings_load();
-		if (err) {
-			LOG_ERR("Cannot load settings");
-			goto error;
-		}
-		LOG_INF("Settings loaded");
 	}
 
 error:
@@ -99,12 +91,17 @@ static int configure_filters(void)
 	bt_scan_filter_remove_all();
 
 	static_assert(DEVICE_NAME_LEN > 0, "Invalid device name");
-	int err = bt_scan_filter_add(BT_SCAN_FILTER_TYPE_NAME, DEVICE_NAME);
+
+	static const struct bt_scan_short_name short_name = {
+		.name = DEVICE_NAME,
+		.min_len = DEVICE_NAME_LEN,
+	};
+	int err = bt_scan_filter_add(BT_SCAN_FILTER_TYPE_SHORT_NAME, &short_name);
 	if (err) {
 		LOG_ERR("Name filter cannot be added (err %d)", err);
 		goto error;
 	}
-	u8_t filter_mode = BT_SCAN_NAME_FILTER;
+	u8_t filter_mode = BT_SCAN_SHORT_NAME_FILTER;
 
 	err = bt_scan_filter_add(BT_SCAN_FILTER_TYPE_UUID, BT_UUID_HIDS);
 	if (err) {
@@ -208,26 +205,6 @@ static void start_discovery(struct bt_conn *conn)
 	}
 }
 
-static int start_scanning(void)
-{
-	int err = configure_filters();
-	if (err) {
-		LOG_ERR("Cannot set filters (err %d)", err);
-		goto error;
-	}
-
-	err = bt_scan_start(BT_SCAN_TYPE_SCAN_ACTIVE);
-	if (err) {
-		LOG_ERR("Cannot start scanning (err %d)", err);
-		goto error;
-	}
-
-	LOG_INF("Scan started");
-
-error:
-	return err;
-}
-
 extern bool bt_le_conn_params_valid(const struct bt_le_conn_param *param);
 
 static bool le_param_req(struct bt_conn *conn, struct bt_le_conn_param *param)
@@ -277,15 +254,31 @@ static int scan_init(void)
 
 	bt_conn_cb_register(&conn_callbacks);
 
-	err = start_scanning();
-	if (err) {
-		LOG_ERR("Scanning failed to start (err %d)", err);
-	}
-
 error:
 	return err;
 }
 
+static void scan_start(void)
+{
+	int err = configure_filters();
+	if (err) {
+		LOG_ERR("Cannot set filters (err %d)", err);
+		goto error;
+	}
+
+	err = bt_scan_start(BT_SCAN_TYPE_SCAN_ACTIVE);
+	if (err) {
+		LOG_ERR("Cannot start scanning (err %d)", err);
+		goto error;
+	}
+
+	LOG_INF("Scan started");
+	return;
+
+error:
+	LOG_ERR("Scanning failed to start (err %d)", err);
+	module_set_state(MODULE_STATE_ERROR);
+}
 
 static bool event_handler(const struct event_header *eh)
 {
@@ -306,6 +299,14 @@ static bool event_handler(const struct event_header *eh)
 			} else {
 				module_set_state(MODULE_STATE_READY);
 			}
+		} else if (check_state(event, MODULE_ID(config), MODULE_STATE_READY)) {
+			static bool started;
+
+			__ASSERT_NO_MSG(!started);
+
+			/* Settings need to be loaded before scan start */
+			scan_start();
+			started = true;
 		}
 
 		return false;
@@ -320,7 +321,7 @@ static bool event_handler(const struct event_header *eh)
 			/* Ignore */
 			break;
 		case PEER_STATE_DISCONNECTED:
-			start_scanning();
+			scan_start();
 			break;
 		case PEER_STATE_SECURED:
 			save_address(event->id);

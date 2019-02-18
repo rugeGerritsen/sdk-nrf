@@ -38,8 +38,24 @@ The |NCS| documentation follows the Zephyr style guide, and adds a few more rest
 * Do not use consecutive headings without intervening text.
 * For readability reasons, start every sentence on a new line in the source files.
   In the output, consecutive lines without blank lines in between are combined into one paragraph.
-* Define all external links in the ``links.txt`` file.
-  Do not define them directly in the RST file.
+
+Hyperlinks
+==========
+
+All external links must be defined in the ``links.txt`` file.
+Do not define them directly in the RST file.
+The reason for this is to allow for validating all links in one central location and to make it easy to update breaking links.
+
+Each link should be defined only once in ``links.txt``.
+
+If the link text that is defined in ``links.txt`` does not fit in the context where you use the link, you can override it by using the following syntax::
+
+   `new link text <original link text_>`_
+
+It is also possible to define more than one default link text for a link, which can be useful if you frequently need a different link text::
+
+   .. _`Link text one`:
+   .. _`Link text two`: http://..
 
 
 Doxygen style guide
@@ -185,8 +201,8 @@ The documentation block should precede the documented element.
 Structs
 =======
 
-Documentation of members in a struct cannot be displayed by Sphinx/Breathe.
-Therefore, members must be documented as params.
+The documentation block should precede the documented element.
+Make sure to add ``:members:`` when you include the API documentation in RST; otherwise, the member documentation will not show up.
 
 .. code-block:: c
    :caption: Struct documentation example
@@ -195,15 +211,13 @@ Therefore, members must be documented as params.
 	 *
 	 * @warning When event structure is defined event header must be placed
 	 *          as the first field.
-         *
-         * @param node Linked list node used to chain events.
-         * @param timestamp Timestamp indicating event creation time.
-         * @param event_type Pointer to the event type object.
-         *
 	 */
 	struct event_header {
+
+        	/** Linked list node used to chain events. */
 		sys_dlist_t node;
-		s64_t timestamp;
+
+        	/** Pointer to the event type object. */
 		const struct event_type *type_id;
 	};
 

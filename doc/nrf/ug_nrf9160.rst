@@ -83,7 +83,7 @@ Board controller
 The nRF9160 DK contains an nRF52840 SoC that is used to route some of the nRF9160 SiP
 pins to different components on the DK, such as the Arduino pin headers, LEDs,
 and buttons. For a complete list of all the routing options available, see
-the `nRF9160 DK User Guide`_.
+the `nRF9160 DK board control section in the nRF9160 DK User Guide`_.
 
 The nRF52840 SoC on the DK comes preprogrammed with a firmware.
 If you need to restore the original firmware at some point, download the
@@ -132,15 +132,15 @@ BSD Socket
 	The library source files are located in :file:`lib/bsdlib`.
 
 GPS simulator
-	The **GPS simulator** library simulates a simple GPS device providing NMEA strings
+	The **GPS simulator** simulates a simple GPS device providing NMEA strings
 	with generated data that can be accessed through the GPS API.
-	The library source files are located in :file:`lib/gps_sim`.
+	The driver source files are located in :file:`drivers/gps_sim`.
 
 Sensor simulator
-	The **Sensor simulator** library simulates a sensor device that can be accessed
+	The **Sensor simulator** simulates a sensor device that can be accessed
 	through the sensor API.
 	It is currently supporting the acceleration channels in the API.
-	The library source files are located in :file:`lib/sensor_sim`.
+	The driver source files are located in :file:`drivers/sensor/sensor_sim`.
 
 Samples
 *******
@@ -165,5 +165,5 @@ LTE Sensor Gateway
 AT Client
 	The **AT Client** sample is used to send AT commands over UART to the nRF9160
 	modem and read responses or events.
-	You can send AT commands using a terminal or using the `Link Monitor`_ application.
+	You can send AT commands using a terminal or using the `LTE Link Monitor`_ application.
 	The sample source files are located in :file:`samples/nrf9160/at_client`.

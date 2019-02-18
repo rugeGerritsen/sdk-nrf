@@ -9,10 +9,12 @@ import numpy as np
 import logging
 import csv
 
+
 class EventState(Enum):
     SUBMIT = 1
     PROC_START = 2
     PROC_END = 3
+
 
 class StatsNordic():
     def __init__(self, events_filename, events_types_filename, log_lvl):
@@ -29,16 +31,16 @@ class StatsNordic():
         self.logger_console.setFormatter(self.log_format)
         self.logger.addHandler(self.logger_console)
 
-    def calculate_stats_preset1(self):
-        self.time_between_events("hid_report_sent_event", EventState.PROC_END,
+    def calculate_stats_preset1(self, start_meas, end_meas):
+        self.time_between_events("hid_report_sent_event", EventState.SUBMIT,
                                  "motion_event", EventState.SUBMIT,
-                                 4000)
-        self.time_between_events("motion_event", EventState.SUBMIT,
-                                 "hid_report_sent_event", EventState.PROC_END,
-                                 4000)
+                                 4000, start_meas, end_meas)
+        self.time_between_events("hid_report_sent_event", EventState.SUBMIT,
+                                 "hid_report_sent_event", EventState.SUBMIT,
+                                 4000, start_meas, end_meas)
         plt.show()
 
-    def _get_timestamps(self, event_name, event_state):
+    def _get_timestamps(self, event_name, event_state, start_meas, end_meas):
         event_type_id = self.processed_data.raw_data.get_event_type_id(event_name)
         if event_type_id == None:
             self.logger.error("Event name not found: " + event_name)
@@ -53,16 +55,45 @@ class StatsNordic():
             return None
 
         if event_state == EventState.SUBMIT:
-            timestamps = list(map(lambda x: x.submit.timestamp, trackings))
-        if event_state == EventState.PROC_START:
-            timestamps = list(map(lambda x: x.proc_start_time, trackings))
-        if event_state == EventState.PROC_END:
-            timestamps = list(map(lambda x: x.proc_end_time, trackings))
+            timestamps = np.fromiter(map(lambda x: x.submit.timestamp, trackings),
+                                     dtype=np.float)
+        elif event_state == EventState.PROC_START:
+            timestamps = np.fromiter(map(lambda x: x.proc_start_time, trackings),
+                                     dtype=np.float)
+        elif event_state == EventState.PROC_END:
+            timestamps = np.fromiter(map(lambda x: x.proc_end_time, trackings),
+                                     dtype=np.float)
+
+        timestamps = timestamps[np.where((timestamps > start_meas)
+                                         & (timestamps < end_meas))]
 
         return timestamps
 
+    def calculate_times_between(self, start_times, end_times):
+        if end_times[0] <= start_times[0]:
+            end_times = end_times[1:]
+        if len(start_times) > len(end_times):
+            start_times = start_times[:-1]
+
+        return (end_times - start_times) * 1000
+
+    def prepare_stats_txt(self, times_between):
+        stats_text = "Max time: "
+        stats_text += "{0:.3f}".format(max(times_between)) + "ms\n"
+        stats_text += "Min time: "
+        stats_text += "{0:.3f}".format(min(times_between)) + "ms\n"
+        stats_text += "Mean time: "
+        stats_text += "{0:.3f}".format(np.mean(times_between)) + "ms\n"
+        stats_text += "Std dev of time: "
+        stats_text += "{0:.3f}".format(np.std(times_between)) + "ms\n"
+        stats_text += "Median time: "
+        stats_text += "{0:.3f}".format(np.median(times_between)) + "ms\n"
+
+        return stats_text
+
     def time_between_events(self, start_event_name, start_event_state,
-                            end_event_name, end_event_state, hist_bin_cnt):
+                            end_event_name, end_event_state, hist_bin_cnt=400,
+                            start_meas=0, end_meas=float('inf')):
 
         if not self.processed_data.tracking_execution:
             if start_event_state != EventState.SUBMIT or \
@@ -71,27 +102,26 @@ class StatsNordic():
                                   start_event_name + "->" + end_event_name)
                 return
 
-        start_times = self._get_timestamps(start_event_name, start_event_state)
-        end_times = self._get_timestamps(end_event_name, end_event_state)
+        start_times = self._get_timestamps(start_event_name, start_event_state,
+                                           start_meas, end_meas)
+        end_times = self._get_timestamps(end_event_name, end_event_state,
+                                           start_meas, end_meas)
 
         if start_times is None or end_times is None:
             return
 
-        times_between = []
-        for start in start_times:
-            for end in end_times:
-                if start < end:
-                    #converting times to ms - multiply by 1000
-                    times_between.append((end - start) * 1000)
-                    break
+        if len(start_times) == 0:
+            self.logger.error("No events logged: " + start_event_name)
+            return
+
+        if len(end_times) == 0:
+            self.logger.error("No events logged: " + stop_event_name)
+            return
+
+        times_between = self.calculate_times_between(start_times, end_times)
+        stats_text = self.prepare_stats_txt(times_between)
 
         plt.figure()
-        stats_text = "Max time: "
-        stats_text += "{0:.3f}".format(max(times_between)) + "ms\n"
-        stats_text += "Min time: "
-        stats_text += "{0:.3f}".format(min(times_between)) + "ms\n"
-        stats_text += "Mean time: "
-        stats_text += "{0:.3f}".format(np.mean(times_between)) + "ms\n"
 
         ax = plt.gca()
         stats_textbox = ax.text(0.05,
@@ -112,6 +142,7 @@ class StatsNordic():
                         EventState.PROC_START : "processing start",
                         EventState.PROC_END : "processing end"
         }
+
         title = "From " + start_event_name + ' ' + \
                 event_status_str[start_event_state] + "\nto " + \
                 end_event_name + ' ' + event_status_str[end_event_state] + \
@@ -121,3 +152,4 @@ class StatsNordic():
         plt.hist(times_between, bins = hist_bin_cnt)
         plt.yscale('log')
         plt.grid(True)
+        plt.savefig(title.lower().replace(' ', '_').replace('\n', '_') +'.png')

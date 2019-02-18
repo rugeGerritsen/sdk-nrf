@@ -59,8 +59,17 @@ enum nrf_cloud_sensor {
 	NRF_CLOUD_SENSOR_GPS,
 	/** The FLIP movement sensor on the device. */
 	NRF_CLOUD_SENSOR_FLIP,
+	/** The Button press sensor on the device. */
+	NRF_CLOUD_SENSOR_BUTTON,
 	/** The TEMP sensor on the device. */
 	NRF_CLOUD_SENSOR_TEMP,
+	/** The Humidity sensor on the device. */
+	NRF_CLOUD_SENSOR_HUMID,
+	/** The Air Pressure sensor on the device. */
+	NRF_CLOUD_SENSOR_AIR_PRESS,
+	/** The Air Quality sensor on the device. */
+	NRF_CLOUD_SENSOR_AIR_QUAL,
+
 };
 
 /** @brief User input sequence values for user association type
@@ -75,8 +84,10 @@ enum nrf_cloud_ua_button {
 
 /**@brief Generic encapsulation for any data that is sent to the cloud. */
 struct nrf_cloud_data {
-	u32_t len;       /** Length of the data. */
-	const void *ptr; /** Pointer to the data. */
+        /** Length of the data. */
+	u32_t len;
+        /** Pointer to the data. */
+	const void *ptr;
 };
 
 /**@brief User association types that are supported by the device. */

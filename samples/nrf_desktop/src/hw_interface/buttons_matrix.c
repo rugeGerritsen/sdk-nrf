@@ -6,6 +6,8 @@
 
 #include <zephyr/types.h>
 
+#include <kernel.h>
+#include <spinlock.h>
 #include <soc.h>
 #include <device.h>
 #include <gpio.h>
@@ -22,6 +24,13 @@ LOG_MODULE_REGISTER(MODULE, CONFIG_DESKTOP_BUTTONS_LOG_LEVEL);
 
 #define SCAN_INTERVAL CONFIG_DESKTOP_BUTTONS_MATRIX_SCAN_INTERVAL
 
+enum state {
+	STATE_IDLE,
+	STATE_ACTIVE,
+	STATE_SCANNING,
+	STATE_SUSPENDING
+};
+
 
 static const u8_t col_pin[] = { 2, 21, 20, 19};
 static const u8_t row_pin[] = {29, 31, 22, 24};
@@ -29,8 +38,11 @@ static const u8_t row_pin[] = {29, 31, 22, 24};
 static struct device *gpio_dev;
 static struct gpio_callback gpio_cb;
 static struct k_delayed_work matrix_scan;
-static atomic_t scanning;
-static atomic_t active;
+static enum state state;
+static struct k_spinlock lock;
+
+
+static void matrix_scan_fn(struct k_work *work);
 
 
 static int set_cols(u32_t mask)
@@ -39,7 +51,7 @@ static int set_cols(u32_t mask)
 		u32_t val = (mask & (1 << i)) ? (1) : (0);
 
 		if (gpio_pin_write(gpio_dev, col_pin[i], val)) {
-			LOG_ERR("cannot set pin");
+			LOG_ERR("Cannot set pin");
 
 			return -EFAULT;
 		}
@@ -54,7 +66,7 @@ static int get_rows(u32_t *mask)
 		u32_t val;
 
 		if (gpio_pin_read(gpio_dev, row_pin[i], &val)) {
-			LOG_ERR("cannot get pin");
+			LOG_ERR("Cannot get pin");
 			return -EFAULT;
 		}
 
@@ -89,7 +101,6 @@ static int callback_ctrl(bool enable)
 	/* This must be done with irqs disabled to avoid pin callback
 	 * being fired before others are still not activated.
 	 */
-	unsigned int flags = irq_lock();
 	for (size_t i = 0; (i < ARRAY_SIZE(row_pin)) && !err; i++) {
 		if (enable) {
 			err = gpio_pin_enable_callback(gpio_dev, row_pin[i]);
@@ -97,13 +108,99 @@ static int callback_ctrl(bool enable)
 			err = gpio_pin_disable_callback(gpio_dev, row_pin[i]);
 		}
 	}
-	irq_unlock(flags);
 
 	return err;
 }
 
+static int suspend_nolock(void)
+{
+	int err = -EBUSY;
+
+	switch (state) {
+	case STATE_SCANNING:
+		state = STATE_SUSPENDING;
+		break;
+
+	case STATE_SUSPENDING:
+		/* Waiting for scanning to stop */
+		break;
+
+	case STATE_ACTIVE:
+		state = STATE_IDLE;
+
+		/* Leaving deep sleep requires level interrupt */
+		err = set_trig_mode(GPIO_INT_LEVEL);
+		if (!err) {
+			err = callback_ctrl(true);
+		}
+		break;
+
+	case STATE_IDLE:
+		err = -EALREADY;
+		break;
+
+	default:
+		__ASSERT_NO_MSG(false);
+		break;
+	}
+
+	return err;
+}
+
+static int suspend(void)
+{
+	int err;
+
+	k_spinlock_key_t key = k_spin_lock(&lock);
+	err = suspend_nolock();
+	k_spin_unlock(&lock, key);
+
+	return err;
+}
+
+static void resume(void)
+{
+	k_spinlock_key_t key = k_spin_lock(&lock);
+	if (state != STATE_IDLE) {
+		/* Already activated. */
+		k_spin_unlock(&lock, key);
+		return;
+	}
+
+	int err = callback_ctrl(false);
+	if (err) {
+		LOG_ERR("Cannot disable callbacks");
+	} else {
+		err = set_trig_mode(GPIO_INT_EDGE);
+		if (err) {
+			LOG_ERR("Cannot set trig mode");
+		} else {
+			state = STATE_SCANNING;
+		}
+	}
+
+	/* GPIO callback is disabled - it is safe to unlock */
+	k_spin_unlock(&lock, key);
+
+	if (err) {
+		module_set_state(MODULE_STATE_ERROR);
+	} else {
+		matrix_scan_fn(NULL);
+
+		module_set_state(MODULE_STATE_READY);
+	}
+}
+
 static void matrix_scan_fn(struct k_work *work)
 {
+	if (IS_ENABLED(CONFIG_ASSERT)) {
+		/* Validate state */
+		k_spinlock_key_t key = k_spin_lock(&lock);
+		__ASSERT_NO_MSG((state == STATE_SCANNING) ||
+				(state == STATE_SUSPENDING));
+		k_spin_unlock(&lock, key);
+	}
+
 	/* Get current state */
 	u32_t cur_state[ARRAY_SIZE(col_pin)] = {0};
 
@@ -116,7 +213,7 @@ static void matrix_scan_fn(struct k_work *work)
 		}
 
 		if (err) {
-			LOG_ERR("cannot scan matrix");
+			LOG_ERR("Cannot scan matrix");
 			goto error;
 		}
 	}
@@ -145,10 +242,10 @@ static void matrix_scan_fn(struct k_work *work)
 
 	memcpy(old_state, cur_state, sizeof(old_state));
 
-	if (atomic_get(&scanning) && any_pressed) {
+	if (any_pressed) {
 		/* Avoid draining current between scans */
 		if (set_cols(0x00)) {
-			LOG_ERR("cannot set neutral state");
+			LOG_ERR("Cannot set neutral state");
 			goto error;
 		}
 
@@ -159,19 +256,39 @@ static void matrix_scan_fn(struct k_work *work)
 
 		/* Prepare to wait for a callback */
 		if (set_cols(0xFF)) {
-			LOG_ERR("cannot set neutral state");
+			LOG_ERR("Cannot set neutral state");
 			goto error;
 		}
 
 		/* Make sure that mode is set before callbacks are enabled */
-		atomic_set(&scanning, false);
+		int err = 0;
 
-		int err = callback_ctrl(true);
+		k_spinlock_key_t key = k_spin_lock(&lock);
+		switch (state) {
+		case STATE_SCANNING:
+			state = STATE_ACTIVE;
+			err = callback_ctrl(true);
+			break;
+
+		case STATE_SUSPENDING:
+			state = STATE_ACTIVE;
+			err = suspend_nolock();
+			if (!err) {
+				module_set_state(MODULE_STATE_STANDBY);
+			}
+			__ASSERT_NO_MSG((err != -EBUSY) && (err != -EALREADY));
+			break;
+
+		default:
+			__ASSERT_NO_MSG(false);
+			break;
+		}
+		k_spin_unlock(&lock, key);
+
 		if (err) {
-			LOG_ERR("cannot enable callbacks");
+			LOG_ERR("Cannot enable callbacks");
 			goto error;
 		}
-
 	}
 
 	return;
@@ -183,25 +300,36 @@ error:
 void button_pressed(struct device *gpio_dev, struct gpio_callback *cb,
 		    u32_t pins)
 {
+	k_spinlock_key_t key = k_spin_lock(&lock);
+
 	/* Disable GPIO interrupt */
 	for (size_t i = 0; i < ARRAY_SIZE(row_pin); i++) {
 		int err = gpio_pin_disable_callback(gpio_dev, row_pin[i]);
 		if (err) {
-			LOG_ERR("cannot disable callbacks");
+			LOG_ERR("Cannot disable callbacks");
 		}
 	}
 
-	if (!atomic_get(&active)) {
+	switch (state) {
+	case STATE_IDLE:;
 		struct wake_up_event *event = new_wake_up_event();
 		EVENT_SUBMIT(event);
+		break;
 
-		return;
+	case STATE_ACTIVE:
+		state = STATE_SCANNING;
+		k_delayed_work_submit(&matrix_scan, 0);
+		break;
+
+	case STATE_SCANNING:
+	case STATE_SUSPENDING:
+	default:
+		/* Invalid state */
+		__ASSERT_NO_MSG(false);
+		break;
 	}
 
-	/* Activate periodic scan */
-	__ASSERT_NO_MSG(!atomic_get(&scanning));
-	atomic_set(&scanning, true);
-	k_delayed_work_submit(&matrix_scan, 0);
+	k_spin_unlock(&lock, key);
 }
 
 static void init_fn(void)
@@ -209,7 +337,7 @@ static void init_fn(void)
 	/* Setup GPIO configuration */
 	gpio_dev = device_get_binding(DT_GPIO_P0_DEV_NAME);
 	if (!gpio_dev) {
-		LOG_ERR("cannot get GPIO device binding");
+		LOG_ERR("Cannot get GPIO device binding");
 		return;
 	}
 
@@ -218,14 +346,14 @@ static void init_fn(void)
 				GPIO_DIR_OUT);
 
 		if (err) {
-			LOG_ERR("cannot configure cols");
+			LOG_ERR("Cannot configure cols");
 			goto error;
 		}
 	}
 
 	int err = set_trig_mode(GPIO_INT_EDGE);
 	if (err) {
-		LOG_ERR("cannot set interrupt mode");
+		LOG_ERR("Cannot set interrupt mode");
 		goto error;
 	}
 
@@ -236,7 +364,7 @@ static void init_fn(void)
 		 */
 		err = gpio_pin_disable_callback(gpio_dev, row_pin[i]);
 		if (err) {
-			LOG_ERR("cannot configure rows");
+			LOG_ERR("Cannot configure rows");
 			goto error;
 		}
 
@@ -246,25 +374,21 @@ static void init_fn(void)
 	gpio_init_callback(&gpio_cb, button_pressed, pin_mask);
 	err = gpio_add_callback(gpio_dev, &gpio_cb);
 	if (err) {
-		LOG_ERR("cannot add callback");
+		LOG_ERR("Cannot add callback");
 		goto error;
 	}
 
 	module_set_state(MODULE_STATE_READY);
 
 	/* Perform initial scan */
-	atomic_set(&scanning, true);
+	state = STATE_SCANNING;
+
 	matrix_scan_fn(NULL);
 
 	return;
 
 error:
 	module_set_state(MODULE_STATE_ERROR);
-}
-
-static void term_fn(void)
-{
-	module_set_state(MODULE_STATE_STANDBY);
 }
 
 static bool event_handler(const struct event_header *eh)
@@ -281,7 +405,6 @@ static bool event_handler(const struct event_header *eh)
 			k_delayed_work_init(&matrix_scan, matrix_scan_fn);
 
 			init_fn();
-			atomic_set(&active, true);
 
 			return false;
 		}
@@ -290,43 +413,28 @@ static bool event_handler(const struct event_header *eh)
 	}
 
 	if (is_wake_up_event(eh)) {
-		if (!atomic_get(&active)) {
-			int err = callback_ctrl(false);
-			if (err) {
-				LOG_ERR("cannot disable callbacks");
-			} else {
-				err = set_trig_mode(GPIO_INT_EDGE);
-				if (err) {
-					LOG_ERR("cannot set trig mode");
-					module_set_state(MODULE_STATE_ERROR);
-				} else {
-					module_set_state(MODULE_STATE_READY);
-					atomic_set(&scanning, true);
-					atomic_set(&active, true);
-					matrix_scan_fn(NULL);
-				}
-			}
-		}
+		resume();
 
 		return false;
 	}
 
 	if (is_power_down_event(eh)) {
-		atomic_set(&active, false);
+		int err = suspend();
 
-		bool scn = atomic_get(&scanning);
-		if (!scn) {
-			term_fn();
+		if (!err) {
+			module_set_state(MODULE_STATE_STANDBY);
+			return false;
+		} else if (err == -EALREADY) {
+			/* Already suspended */
+			return false;
+		} else if (err == -EBUSY) {
+			/* Cannot suspend while scanning */
+			return true;
 		}
 
-		/* Leaving deep sleep requires level interrupt */
-		int err = set_trig_mode(GPIO_INT_LEVEL);
-		if (err) {
-			LOG_ERR("Cannot configure an interrupt");
-			module_set_state(MODULE_STATE_ERROR);
-		}
-
-		return scn;
+		LOG_ERR("Error while suspending");
+		module_set_state(MODULE_STATE_ERROR);
+		return true;
 	}
 
 	/* If event is unhandled, unsubscribe. */

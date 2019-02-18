@@ -102,7 +102,7 @@ static int rng_driver_init(struct device *dev)
 
 	k_sem_init(&rng_data.sem_sync, 0, 1);
 
-	IRQ_CONNECT(NRF5_IRQ_RNG_IRQn, CONFIG_ENTROPY_NRF5_PRI, rng_driver_isr, NULL, 0);
+	IRQ_CONNECT(NRF5_IRQ_RNG_IRQn, CONFIG_ENTROPY_NRF_PRI, rng_driver_isr, NULL, 0);
 
 	return 0;
 }

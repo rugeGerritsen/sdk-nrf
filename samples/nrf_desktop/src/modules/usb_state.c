@@ -25,7 +25,8 @@ LOG_MODULE_REGISTER(MODULE, CONFIG_DESKTOP_USB_STATE_LOG_LEVEL);
 #include "config_event.h"
 
 static enum usb_state state;
-
+static u8_t hid_protocol = HID_PROTOCOL_REPORT;
+static struct device *usb_dev;
 
 static int get_report(struct usb_setup_packet *setup, s32_t *len, u8_t **data)
 {
@@ -56,6 +57,7 @@ static int set_report(struct usb_setup_packet *setup, s32_t *len, u8_t **data)
 
 			event->id = buffer[1];
 			memcpy(event->data, &(buffer[2]), sizeof(event->data));
+			event->store_needed = true;
 
 			EVENT_SUBMIT(event);
 		}
@@ -91,33 +93,48 @@ static void send_mouse_report(const struct hid_mouse_event *event)
 		return;
 	}
 
-	s16_t wheel = max(min(event->wheel, REPORT_MOUSE_WHEEL_MAX),
-			  REPORT_MOUSE_WHEEL_MIN);
-	s16_t x = max(min(event->dx, REPORT_MOUSE_XY_MAX),
-		      REPORT_MOUSE_XY_MIN);
-	s16_t y = max(min(event->dy, REPORT_MOUSE_XY_MAX),
-		      REPORT_MOUSE_XY_MIN);
+	u8_t buffer[(hid_protocol) ?
+		    REPORT_SIZE_MOUSE + sizeof(u8_t) :
+		    REPORT_SIZE_MOUSE_BOOT];
 
-	/* Convert to little-endian. */
-	u8_t x_buff[2];
-	u8_t y_buff[2];
+	if (hid_protocol == HID_PROTOCOL_REPORT) {
+		s16_t wheel = max(min(event->wheel, REPORT_MOUSE_WHEEL_MAX),
+				REPORT_MOUSE_WHEEL_MIN);
+		s16_t x = max(min(event->dx, REPORT_MOUSE_XY_MAX),
+				REPORT_MOUSE_XY_MIN);
+		s16_t y = max(min(event->dy, REPORT_MOUSE_XY_MAX),
+				REPORT_MOUSE_XY_MIN);
+		/* Convert to little-endian. */
+		u8_t x_buff[2];
+		u8_t y_buff[2];
 
-	sys_put_le16(x, x_buff);
-	sys_put_le16(y, y_buff);
+		sys_put_le16(x, x_buff);
+		sys_put_le16(y, y_buff);
 
-	/* Encode report. */
-	u8_t buffer[REPORT_SIZE_MOUSE + sizeof(u8_t)];
+		__ASSERT(sizeof(buffer) == 6, "Invalid report size");
 
-	static_assert(sizeof(buffer) == 6, "Invalid report size");
+		/* Encode report. */
+		buffer[0] = REPORT_ID_MOUSE;
+		buffer[1] = event->button_bm;
+		buffer[2] = wheel;
+		buffer[3] = x_buff[0];
+		buffer[4] = (y_buff[0] << 4) | (x_buff[1] & 0x0f);
+		buffer[5] = (y_buff[1] << 4) | (y_buff[0] >> 4);
 
-	buffer[0] = REPORT_ID_MOUSE;
-	buffer[1] = event->button_bm;
-	buffer[2] = wheel;
-	buffer[3] = x_buff[0];
-	buffer[4] = (y_buff[0] << 4) | (x_buff[1] & 0x0f);
-	buffer[5] = (y_buff[1] << 4) | (y_buff[0] >> 4);
+	} else {
+		s8_t x = max(min(event->dx, REPORT_MOUSE_XY_MAX_BOOT),
+				REPORT_MOUSE_XY_MIN_BOOT);
+		s8_t y = max(min(event->dy, REPORT_MOUSE_XY_MAX_BOOT),
+				REPORT_MOUSE_XY_MIN_BOOT);
 
-	int err = hid_int_ep_write(buffer, sizeof(buffer), NULL);
+		__ASSERT(sizeof(buffer) == 3, "Invalid boot report size");
+
+		buffer[0] = event->button_bm;
+		buffer[1] = x;
+		buffer[2] = y;
+
+	}
+	int err = hid_int_ep_write(usb_dev, buffer, sizeof(buffer), NULL);
 	if (err) {
 		LOG_ERR("Cannot send report (%d)", err);
 		mouse_report_sent(true);
@@ -154,7 +171,9 @@ static void device_status(enum usb_dc_status_code cb_status, const u8_t *param)
 
 	switch (cb_status) {
 	case USB_DC_CONNECTED:
-		__ASSERT_NO_MSG(state == USB_STATE_DISCONNECTED);
+		if (state != USB_STATE_DISCONNECTED) {
+			LOG_WRN("USB_DC_CONNECTED when USB is not disconnected");
+		}
 		new_state = USB_STATE_POWERED;
 		break;
 
@@ -169,7 +188,9 @@ static void device_status(enum usb_dc_status_code cb_status, const u8_t *param)
 		break;
 
 	case USB_DC_RESET:
-		__ASSERT_NO_MSG(state != USB_STATE_DISCONNECTED);
+		if (state == USB_STATE_DISCONNECTED) {
+			LOG_WRN("USB_DC_RESET when USB is disconnected");
+		}
 		new_state = USB_STATE_POWERED;
 		break;
 
@@ -221,19 +242,33 @@ static void device_status(enum usb_dc_status_code cb_status, const u8_t *param)
 	}
 }
 
+static void protocol_change(u8_t protocol)
+{
+	hid_protocol = protocol;
+	LOG_INF("%s_PROTOCOL selected", protocol ? "REPORT" : "BOOT");
+}
+
 static int usb_init(void)
 {
-	static const struct hid_ops ops = {
-		.get_report   = get_report,
-		.set_report   = set_report,
-		.int_in_ready = mouse_report_sent_cb,
-		.status_cb    = device_status,
-	};
-	usb_hid_register_device(hid_report_desc, hid_report_desc_size, &ops);
+	usb_dev = device_get_binding(CONFIG_USB_HID_DEVICE_NAME_0);
+	if (usb_dev == NULL) {
+		return -ENXIO;
+	}
 
-	int err = usb_hid_init();
+	static const struct hid_ops ops = {
+		.get_report   		= get_report,
+		.set_report   		= set_report,
+		.int_in_ready 		= mouse_report_sent_cb,
+		.status_cb    		= device_status,
+		.protocol_change 	= protocol_change,
+	};
+
+	usb_hid_register_device(usb_dev, hid_report_desc,
+				hid_report_desc_size, &ops);
+
+	int err = usb_hid_init(usb_dev);
 	if (err) {
-		LOG_ERR("cannot initialize HID class");
+		LOG_ERR("Cannot initialize HID class");
 	}
 
 	return err;
@@ -259,7 +294,7 @@ static bool event_handler(const struct event_header *eh)
 			initialized = true;
 
 			if (usb_init()) {
-				LOG_ERR("cannot initialize");
+				LOG_ERR("Cannot initialize");
 				module_set_state(MODULE_STATE_ERROR);
 			} else {
 				module_set_state(MODULE_STATE_READY);

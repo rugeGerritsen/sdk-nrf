@@ -114,7 +114,7 @@ static const struct clock_control_driver_api hf_clock_control_api = {
 	.get_rate = hf_clock_get_rate,
 };
 
-DEVICE_AND_API_INIT(hf_clock, CONFIG_CLOCK_CONTROL_NRF5_M16SRC_DRV_NAME,
+DEVICE_AND_API_INIT(hf_clock, CONFIG_CLOCK_CONTROL_NRF_M16SRC_DRV_NAME,
 		    clock_control_init, NULL, NULL, PRE_KERNEL_1,
 		    CONFIG_KERNEL_INIT_PRIORITY_DEVICE, &hf_clock_control_api);
 
@@ -126,7 +126,7 @@ static const struct clock_control_driver_api lf_clock_control_api = {
 	.get_rate = lf_clock_get_rate,
 };
 
-DEVICE_AND_API_INIT(lf_clock, CONFIG_CLOCK_CONTROL_NRF5_K32SRC_DRV_NAME,
+DEVICE_AND_API_INIT(lf_clock, CONFIG_CLOCK_CONTROL_NRF_K32SRC_DRV_NAME,
 		    clock_control_init, NULL, NULL, PRE_KERNEL_1,
 		    CONFIG_KERNEL_INIT_PRIORITY_DEVICE, &lf_clock_control_api);
 

@@ -13,7 +13,6 @@
 #include <gpio.h>
 #include <hal/nrf_gpiote.h>
 
-#include <misc/printk.h>
 #include <profiler.h>
 
 #include "power_event.h"
@@ -111,29 +110,29 @@ static void create_device_list(struct device_list *dl)
 	dl->count = dcount;
 }
 
-int _sys_soc_suspend(s32_t ticks)
+enum power_states sys_suspend(s32_t ticks)
 {
 	if ((ticks != K_FOREVER) && (ticks < MSEC(100))) {
-		return SYS_PM_NOT_HANDLED;
+		return SYS_POWER_STATE_ACTIVE;
 	}
 
 	if (power_state == POWER_STATE_TURN_OFF) {
-		LOG_WRN("system turned off");
+		LOG_WRN("System turned off");
 		LOG_PANIC();
 
 		power_state = POWER_STATE_OFF;
 
-		_sys_soc_pm_idle_exit_notification_disable();
+		sys_pm_idle_exit_notification_disable();
 		suspend_devices(&device_list);
-		_sys_soc_set_power_state(SYS_POWER_STATE_DEEP_SLEEP);
+		sys_set_power_state(SYS_POWER_STATE_DEEP_SLEEP);
 
 		/* System is off here - wake up leads to reboot. */
 		__ASSERT_NO_MSG(false);
 
-		return SYS_PM_DEEP_SLEEP;
+		return SYS_POWER_STATE_DEEP_SLEEP;
 	}
 
-	return SYS_PM_NOT_HANDLED;
+	return SYS_POWER_STATE_ACTIVE;
 }
 
 static void power_down(struct k_work *work)
@@ -144,7 +143,7 @@ static void power_down(struct k_work *work)
 	atomic_val_t cnt = atomic_add(&power_down_count, POWER_DOWN_CHECK_MS);
 
 	if (cnt >= POWER_DOWN_TIMEOUT_MS) {
-		LOG_INF("system power down");
+		LOG_INF("System power down");
 
 		struct power_down_event *event = new_power_down_event();
 		power_state = POWER_STATE_SUSPENDING;
@@ -194,15 +193,15 @@ static bool event_handler(const struct event_header *eh)
 	}
 
 	if (is_power_down_event(eh)) {
-		if (!usb_connected) {
-			LOG_INF("power down the board");
+		if (!usb_connected && (power_state == POWER_STATE_SUSPENDING)) {
+			LOG_INF("Power down the board");
 
 			profiler_term();
 
 			if (connection_count > 0) {
 				/* Connection is active, keep OS alive. */
 				power_state = POWER_STATE_SUSPENDED;
-				LOG_WRN("system suspended");
+				LOG_WRN("System suspended");
 			} else {
 				/* No active connection, turn system off. */
 				system_off();
@@ -213,7 +212,7 @@ static bool event_handler(const struct event_header *eh)
 	}
 
 	if (is_wake_up_event(eh)) {
-		LOG_INF("wake up the board");
+		LOG_INF("Wake up the board");
 
 		power_state = POWER_STATE_IDLE;
 		if (!usb_connected) {
@@ -268,8 +267,11 @@ static bool event_handler(const struct event_header *eh)
 			case USB_STATE_POWERED:
 				usb_connected = true;
 				k_delayed_work_cancel(&power_down_trigger);
-				struct wake_up_event *wue = new_wake_up_event();
-				EVENT_SUBMIT(wue);
+				if (power_state != POWER_STATE_IDLE) {
+					struct wake_up_event *wue =
+						new_wake_up_event();
+					EVENT_SUBMIT(wue);
+				}
 				break;
 
 			case USB_STATE_DISCONNECTED:
@@ -304,7 +306,7 @@ static bool event_handler(const struct event_header *eh)
 			__ASSERT_NO_MSG(!initialized);
 			initialized = true;
 
-			LOG_INF("activate power manager");
+			LOG_INF("Activate power manager");
 
 			create_device_list(&device_list);
 

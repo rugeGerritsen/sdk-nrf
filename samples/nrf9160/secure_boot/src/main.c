@@ -301,7 +301,7 @@ static void secure_boot_config_peripherals(void)
 		NRFX_PERIPHERAL_ID_GET(NRF_VMC_S), 0);
 	/* Configure GPIO as Non-Secure */
 	secure_boot_config_peripheral(
-		NRFX_PERIPHERAL_ID_GET(NRF_GPIO), 0);
+		NRFX_PERIPHERAL_ID_GET(NRF_P0), 0);
 	/* Make GPIOTE1 interrupt available in Non-Secure domain */
 	secure_boot_config_peripheral(
 		NRFX_PERIPHERAL_ID_GET(NRF_GPIOTE1_NS), 0);
@@ -370,7 +370,7 @@ static void secure_boot_jump(void)
 	/* Extract initial MSP of the Non-Secure firmware image.
 	 * The assumption is that the MSP is located at VTOR_NS[0].
 	 */
-	u32_t *vtor_ns = (u32_t *)FLASH_AREA_IMAGE_0_NONSECURE_OFFSET_0;
+	u32_t *vtor_ns = (u32_t *)DT_FLASH_AREA_IMAGE_0_NONSECURE_OFFSET_0;
 
 	printk("Secure Boot: MSP_NS %x\n", vtor_ns[0]);
 
