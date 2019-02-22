@@ -184,6 +184,18 @@ static void recv_thread(void *p1, void *p2, void *p3)
 	BT_DBG("Started");
 	while (1) {
 		k_sem_take(&sem_recv, K_FOREVER);
+		while (1) {
+			errcode = MULTITHREADING_LOCK_ACQUIRE();
+			if (!errcode) {
+				errcode = hci_evt_get(hci_buffer);
+				MULTITHREADING_LOCK_RELEASE();
+			}
+			if (!errcode) {
+				event_packet_process(hci_buffer);
+			} else {
+				break;
+			}
+		};
 
 		while (1) {
 			errcode = MULTITHREADING_LOCK_ACQUIRE();
@@ -193,19 +205,6 @@ static void recv_thread(void *p1, void *p2, void *p3)
 			}
 			if (!errcode) {
 				data_packet_process(hci_buffer);
-			} else {
-				break;
-			}
-		};
-
-		while (1) {
-			errcode = MULTITHREADING_LOCK_ACQUIRE();
-			if (!errcode) {
-				errcode = hci_evt_get(hci_buffer);
-				MULTITHREADING_LOCK_RELEASE();
-			}
-			if (!errcode) {
-				event_packet_process(hci_buffer);
 			} else {
 				break;
 			}
