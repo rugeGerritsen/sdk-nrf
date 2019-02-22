@@ -155,8 +155,8 @@ static void event_packet_process(u8_t *hci_buf)
 		       "(%02x), length (%d)",
 		       hci_buf[2], hci_buf[1]);
 	} else {
-		uint8_t opcode = hci_buf[2] << 8 | hci_buf[3];
-		BT_DBG("Event: event code (%02x), "
+		u16_t opcode = hci_buf[2] << 8 | hci_buf[3];
+		BT_DBG("Event: event code (0x%02x), "
 		       "length (%d), "
 		       "num_complete (%d), "
 		       "opcode (%d)"
