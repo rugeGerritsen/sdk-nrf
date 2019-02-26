@@ -134,11 +134,11 @@ static size_t unaligned_word_copy(u32_t *word_dst, void *dst, const void *src, s
 	 *
 	 * max_offset             : max(1, 2) => 2
 	 * remaining_bytes_in_word: 4 - 2     => 2
-	 * bytes_to_copy          : min(1, 2) => 1
+	 * bytes_to_copy          : MIN(1, 2) => 1
 	 */
-	size_t max_offset = max(offset_32(dst), offset_32(src));
+	size_t max_offset = MAX(offset_32(dst), offset_32(src));
 	size_t remaining_bytes_in_word = sizeof(u32_t) - max_offset;
-	size_t bytes_to_copy = min(len, remaining_bytes_in_word);
+	size_t bytes_to_copy = MIN(len, remaining_bytes_in_word);
 
 	/* nRF52832 Product specification:
 	 *  Only full 32-bit words can be written to Flash using the
@@ -155,7 +155,7 @@ static int flash_op_write(void)
 	if (is_aligned_32(flash_state.addr) &&
 	    is_aligned_32((off_t) flash_state.data) &&
 	    flash_state.len >= sizeof(u32_t)) {
-		flash_state.prev_len = min(align_32(flash_state.len), NRF_FICR->CODEPAGESIZE);
+		flash_state.prev_len = MIN(align_32(flash_state.len), NRF_FICR->CODEPAGESIZE);
 		return ble_controller_flash_write((u32_t) flash_state.addr,
 						  flash_state.data,
 						  bytes_to_words(flash_state.prev_len),
