@@ -241,6 +241,10 @@ static int hci_driver_open(void)
 			NULL, NULL, NULL, K_PRIO_COOP(CONFIG_BLECTLR_PRIO), 0,
 			K_NO_WAIT);
 
+	uint8_t build_revision[20];
+	ble_controller_build_revision_get(build_revision);
+	LOG_HEXDUMP_INF(build_revision, sizeof(build_revision), "BLE controller build revision: ");
+
 	return 0;
 }
 
