@@ -267,20 +267,6 @@ static void event_packet_process(uint8_t *hci_buf)
 
 		BT_DBG("LE Meta Event (0x%02x), len (%u)",
 		       me->subevent, hdr->len);
-	} else if (hdr->evt == BT_HCI_EVT_CMD_COMPLETE) {
-		struct bt_hci_evt_cmd_complete *cc = (void *)&hci_buf[2];
-		struct bt_hci_evt_cc_status *ccs = (void *)&hci_buf[5];
-		uint16_t opcode = sys_le16_to_cpu(cc->opcode);
-
-		BT_DBG("Command Complete (0x%04x) status: 0x%02x,"
-		       " ncmd: %u, len %u",
-		       opcode, ccs->status, cc->ncmd, hdr->len);
-	} else if (hdr->evt == BT_HCI_EVT_CMD_STATUS) {
-		struct bt_hci_evt_cmd_status *cs = (void *)&hci_buf[2];
-		uint16_t opcode = sys_le16_to_cpu(cs->opcode);
-
-		BT_DBG("Command Status (0x%04x) status: 0x%02x",
-		       opcode, cs->status);
 	} else {
 		BT_DBG("Event (0x%02x) len %u", hdr->evt, hdr->len);
 	}
@@ -305,18 +291,43 @@ static void event_packet_process(uint8_t *hci_buf)
 static bool fetch_and_process_hci_evt(uint8_t *p_hci_buffer)
 {
 	int errcode;
+	struct net_buf *cmd_complete_or_status = hci_internal_cmd_complete_get();
 
-	errcode = MULTITHREADING_LOCK_ACQUIRE();
-	if (!errcode) {
-		errcode = hci_internal_evt_get(p_hci_buffer);
-		MULTITHREADING_LOCK_RELEASE();
+	if (cmd_complete_or_status) {
+
+		struct bt_hci_evt_hdr *hdr = (void *)cmd_complete_or_status->b.data;
+		if (hdr->evt == BT_HCI_EVT_CMD_COMPLETE) {
+			struct bt_hci_evt_cmd_complete *cc = (void *)&cmd_complete_or_status->b.data[2];
+			struct bt_hci_evt_cc_status *ccs = (void *)&cmd_complete_or_status->b.data[5];
+			uint16_t opcode = sys_le16_to_cpu(cc->opcode);
+
+			BT_DBG("Command Complete (0x%04x) status: 0x%02x,"
+			       " ncmd: %u, len %u",
+			       opcode, ccs->status, cc->ncmd, hdr->len);
+		} else if (hdr->evt == BT_HCI_EVT_CMD_STATUS) {
+			struct bt_hci_evt_cmd_status *cs = (void *)&cmd_complete_or_status->b.data[2];
+			uint16_t opcode = sys_le16_to_cpu(cs->opcode);
+
+			BT_DBG("Command Status (0x%04x) status: 0x%02x",
+			       opcode, cs->status);
+		}
+
+		bt_recv(cmd_complete_or_status);
+	} else {
+		errcode = MULTITHREADING_LOCK_ACQUIRE();
+		if (!errcode) {
+			errcode = sdc_hci_evt_get(p_hci_buffer);
+			MULTITHREADING_LOCK_RELEASE();
+		}
+
+		if (errcode) {
+			return false;
+		}
+
+		event_packet_process(p_hci_buffer);
 	}
 
-	if (errcode) {
-		return false;
-	}
 
-	event_packet_process(p_hci_buffer);
 	return true;
 }
 

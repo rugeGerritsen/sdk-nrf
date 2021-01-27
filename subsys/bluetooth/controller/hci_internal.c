@@ -6,6 +6,7 @@
 
 #include <bluetooth/hci.h>
 #include <bluetooth/hci_err.h>
+#include <bluetooth/buf.h>
 #include <sys/byteorder.h>
 #include <sdc_hci.h>
 #include <sdc_hci_cmd_controller_baseband.h>
@@ -21,11 +22,7 @@
 				+ sizeof(struct bt_hci_evt_cmd_complete) \
 				+ sizeof(struct bt_hci_evt_cc_status))
 
-static struct
-{
-	bool occurred; /**< Set in only one execution context */
-	uint8_t raw_event[CONFIG_BT_RX_BUF_LEN];
-} cmd_complete_or_status;
+static struct net_buf * cmd_complete_or_status;
 
 static bool command_generates_command_complete_event(uint16_t hci_opcode)
 {
@@ -904,9 +901,12 @@ int hci_internal_cmd_put(uint8_t *cmd_in)
 {
 	uint16_t opcode = sys_get_le16(cmd_in);
 
-	if (cmd_complete_or_status.occurred) {
+	if (cmd_complete_or_status) {
 		return -NRF_EPERM;
 	}
+
+	cmd_complete_or_status = bt_buf_get_cmd_complete(K_FOREVER);
+	uint8_t *event_out = net_buf_tail(cmd_complete_or_status);
 
 	if ((((struct bt_hci_cmd_hdr *)cmd_in)->param_len + BT_HCI_CMD_HDR_SIZE)
 		> HCI_CMD_PACKET_MAX_SIZE) {
@@ -914,53 +914,49 @@ int hci_internal_cmd_put(uint8_t *cmd_in)
 	}
 
 	if (!IS_ENABLED(CONFIG_BT_CTLR_ADV_EXT)) {
-		cmd_put(cmd_in, &cmd_complete_or_status.raw_event[0]);
+		cmd_put(cmd_in, event_out);
 	} else if (!is_host_using_legacy_and_extended_commands(opcode)) {
-		cmd_put(cmd_in, &cmd_complete_or_status.raw_event[0]);
+		cmd_put(cmd_in, event_out);
 	} else {
 		/* The host is violating the specification
 		 * by mixing legacy and extended commands.
 		 */
 		if (command_generates_command_complete_event(opcode)) {
-			(void)encode_command_complete_header(cmd_complete_or_status.raw_event,
+			(void)encode_command_complete_header(event_out,
 							     opcode,
 							     CMD_COMPLETE_MIN_SIZE,
 							     BT_HCI_ERR_CMD_DISALLOWED);
 		} else {
-			(void)encode_command_status(cmd_complete_or_status.raw_event,
+			(void)encode_command_status(event_out,
 						    opcode,
 						    BT_HCI_ERR_CMD_DISALLOWED);
 		}
 	}
 
+	struct bt_hci_evt_hdr *evt_hdr = (struct bt_hci_evt_hdr *)event_out;
+	net_buf_add(cmd_complete_or_status, evt_hdr->len + sizeof(*evt_hdr));
+
 #if defined(CONFIG_BT_HCI_ACL_FLOW_CONTROL)
-	if ((opcode != SDC_HCI_OPCODE_CMD_CB_HOST_NUMBER_OF_COMPLETED_PACKETS)
-	    ||
-	    (cmd_complete_or_status.raw_event[CMD_COMPLETE_MIN_SIZE - 1] != 0))
-#endif
+	uint8_t *status = net_buf_tail(cmd_complete_or_status) - 1;
+	if ((opcode == SDC_HCI_OPCODE_CMD_CB_HOST_NUMBER_OF_COMPLETED_PACKETS)
+	    &&
+	    (status == 0))
 	{
 		/* SDC_HCI_OPCODE_CMD_CB_HOST_NUMBER_OF_COMPLETED_PACKETS will only generate
 		 *  command complete if it fails.
 		 */
-
-		cmd_complete_or_status.occurred = true;
+		net_buf_unref(cmd_complete_or_status);
 	}
+#endif
+
 
 	return 0;
 }
 
-int hci_internal_evt_get(uint8_t *evt_out)
+struct net_buf * hci_internal_cmd_complete_get(void)
 {
-	if (cmd_complete_or_status.occurred) {
-		struct bt_hci_evt_hdr *evt_hdr = (void *)&cmd_complete_or_status.raw_event[0];
+	struct net_buf * event_out = cmd_complete_or_status;
+	cmd_complete_or_status = NULL;
 
-		memcpy(evt_out,
-		       &cmd_complete_or_status.raw_event[0],
-		       evt_hdr->len + BT_HCI_EVT_HDR_SIZE);
-		cmd_complete_or_status.occurred = false;
-
-		return 0;
-	}
-
-	return sdc_hci_evt_get(evt_out);
+	return event_out;
 }

@@ -24,19 +24,12 @@
  */
 int hci_internal_cmd_put(uint8_t *cmd_in);
 
-/** @brief Retrieve an HCI event packet from the SoftDevice Controller.
+/** @brief Retrieve a a command complete event if available.
  *
  * This API is non-blocking.
- *
- * @note The application should ensure that the size of the provided buffer is at least
- *       @ref HCI_EVENT_PACKET_MAX_SIZE bytes.
- *
- * @param[in,out] evt_out Buffer where the HCI event will be stored.
- *                        If an event is retrieved, the first byte corresponds to Event Code,
- *                        as specified by the Bluetooth Core Specification.
- *
- * @return Zero on success or (negative) error code otherwise.
+
+ * @return A buffer on success or NULL otherwise.
  */
-int hci_internal_evt_get(uint8_t *evt_out);
+struct net_buf * hci_internal_cmd_complete_get(void);
 
 #endif
