@@ -11,28 +11,28 @@
 # https://developer.nordicsemi.com/nRF_Connect_SDK/doc/latest/zephyr/guides/west/index.html
 
 manifest:
-  version: "0.12"
+  version: '0.12'
 
   # "remotes" is a list of locations where git repositories are cloned
   # and fetched from.
   remotes:
     # nRF Connect SDK GitHub organization.
     # NCS repositories are hosted here.
-    - name: ncs
-      url-base: https://github.com/nrfconnect
+  - name: ncs
+    url-base: https://github.com/nrfconnect
     # Third-party repository sources:
-    - name: zephyrproject
-      url-base: https://github.com/zephyrproject-rtos
-    - name: throwtheswitch
-      url-base: https://github.com/ThrowTheSwitch
-    - name: armmbed
-      url-base: https://github.com/ARMmbed
-    - name: alexa
-      url-base: https://github.com/alexa
-    - name: nordicsemi
-      url-base: https://github.com/NordicSemiconductor
-    - name: memfault
-      url-base: https://github.com/memfault
+  - name: zephyrproject
+    url-base: https://github.com/zephyrproject-rtos
+  - name: throwtheswitch
+    url-base: https://github.com/ThrowTheSwitch
+  - name: armmbed
+    url-base: https://github.com/ARMmbed
+  - name: alexa
+    url-base: https://github.com/alexa
+  - name: nordicsemi
+    url-base: https://github.com/NordicSemiconductor
+  - name: memfault
+    url-base: https://github.com/memfault
 
   # If not otherwise specified, the projects below should be obtained
   # from the ncs remote.
@@ -50,10 +50,10 @@ manifest:
     #
     # https://developer.nordicsemi.com/nRF_Connect_SDK/doc/latest/zephyr/introduction/index.html
     # https://developer.nordicsemi.com/nRF_Connect_SDK/doc/latest/zephyr/guides/modules.html
-    - name: zephyr
-      repo-path: sdk-zephyr
-      revision: 240c7b9a691f6bcee824d1b26a40a368a916bb05
-      import:
+  - name: zephyr
+    repo-path: sdk-zephyr
+    revision: 240c7b9a691f6bcee824d1b26a40a368a916bb05
+    import:
         # In addition to the zephyr repository itself, NCS also
         # imports the contents of zephyr/west.yml at the above
         # revision. Only the projects explicitly named in the
@@ -65,122 +65,122 @@ manifest:
         # the zephyr project.
         #
         # Please keep this list sorted alphabetically.
-        name-allowlist:
-          - TraceRecorderSource
-          - canopennode
-          - civetweb
-          - cmsis
-          - edtt
-          - fatfs
-          - fff
-          - hal_nordic
-          - hal_st
-          - libmetal
-          - littlefs
-          - loramac-node
-          - lvgl
-          - lz4
-          - mbedtls
-          - mipi-sys-t
-          - nanopb
-          - net-tools
-          - nrf_hw_models
-          - open-amp
-          - openthread
-          - psa-arch-tests
-          - segger
-          - tinycbor
-          - tinycrypt
-          - tf-m-tests
-          - zscilib
+      name-allowlist:
+      - TraceRecorderSource
+      - canopennode
+      - civetweb
+      - cmsis
+      - edtt
+      - fatfs
+      - fff
+      - hal_nordic
+      - hal_st
+      - libmetal
+      - littlefs
+      - loramac-node
+      - lvgl
+      - lz4
+      - mbedtls
+      - mipi-sys-t
+      - nanopb
+      - net-tools
+      - nrf_hw_models
+      - open-amp
+      - openthread
+      - psa-arch-tests
+      - segger
+      - tinycbor
+      - tinycrypt
+      - tf-m-tests
+      - zscilib
 
     # NCS repositories.
     #
     # Some of these are also Zephyr modules which have NCS-specific
     # changes.
-    - name: mcuboot
-      repo-path: sdk-mcuboot
-      revision: 132a537bf94044be93240a43b7622b3040bd017e
-      path: bootloader/mcuboot
-    - name: mbedtls-nrf
-      path: mbedtls
-      repo-path: sdk-mbedtls
-      revision: v3.0.0-ncs1
-    - name: nrfxlib
-      repo-path: sdk-nrfxlib
-      path: nrfxlib
-      revision: 10a433b07290b5df928a5471d681a9d41452c862
-    - name: trusted-firmware-m
-      repo-path: sdk-trusted-firmware-m
-      path: modules/tee/tf-m/trusted-firmware-m
-      revision: 7d4a7139009c24ffa6edfb7f24fe32090bca0583
-    - name: tfm-mcuboot # This is used by the trusted-firmware-m module.
-      repo-path: sdk-mcuboot
-      path: modules/tee/tfm-mcuboot
-      revision: v1.7.2-ncs1
-    - name: matter
-      repo-path: sdk-connectedhomeip
-      path: modules/lib/matter
-      revision: 4c061d1cecd87dfaed9d0084ad14588af36b2b49
-      submodules:
-        - name: nlio
-          path: third_party/nlio/repo
-        - name: nlassert
-          path: third_party/nlassert/repo
-        - name: pigweed
-          path: third_party/pigweed/repo
-    - name: nrf-802154
-      repo-path: sdk-nrf-802154
-      path: nrf-802154
-      revision: a460710974290e2515b1656a265251b2c00be726
-      groups:
-      - nrf-802154
-    - name: cjson
-      repo-path: sdk-cjson
-      path: modules/lib/cjson
-      revision: c6af068b7f05207b28d68880740e4b9ec1e4b50a
-    - name: homekit
-      repo-path: sdk-homekit
-      revision: 1ebf963ec537574fed31f32a71d29e647b648f81
-      groups:
-      - homekit
-    - name: find-my
-      repo-path: sdk-find-my
-      revision: 7fdf4606627ececece7f3865107e6cdaa052537d
-      groups:
-      - find-my
-    - name: sdk-lc3
-      revision: c47d9ee21c9cd8626a903c2e2f0c80c0920a1eb8
-      path: modules/lib/lc3
-      groups:
-      - nrf5340_audio
+  - name: mcuboot
+    repo-path: sdk-mcuboot
+    revision: 132a537bf94044be93240a43b7622b3040bd017e
+    path: bootloader/mcuboot
+  - name: mbedtls-nrf
+    path: mbedtls
+    repo-path: sdk-mbedtls
+    revision: v3.0.0-ncs1
+  - name: nrfxlib
+    repo-path: sdk-nrfxlib
+    path: nrfxlib
+    revision: 10a433b07290b5df928a5471d681a9d41452c862
+  - name: trusted-firmware-m
+    repo-path: sdk-trusted-firmware-m
+    path: modules/tee/tf-m/trusted-firmware-m
+    revision: 7d4a7139009c24ffa6edfb7f24fe32090bca0583
+  - name: tfm-mcuboot   # This is used by the trusted-firmware-m module.
+    repo-path: sdk-mcuboot
+    path: modules/tee/tfm-mcuboot
+    revision: v1.7.2-ncs1
+  - name: matter
+    repo-path: sdk-connectedhomeip
+    path: modules/lib/matter
+    revision: 4c061d1cecd87dfaed9d0084ad14588af36b2b49
+    submodules:
+    - name: nlio
+      path: third_party/nlio/repo
+    - name: nlassert
+      path: third_party/nlassert/repo
+    - name: pigweed
+      path: third_party/pigweed/repo
+  - name: nrf-802154
+    repo-path: sdk-nrf-802154
+    path: nrf-802154
+    revision: a460710974290e2515b1656a265251b2c00be726
+    groups:
+    - nrf-802154
+  - name: cjson
+    repo-path: sdk-cjson
+    path: modules/lib/cjson
+    revision: c6af068b7f05207b28d68880740e4b9ec1e4b50a
+  - name: homekit
+    repo-path: sdk-homekit
+    revision: 1ebf963ec537574fed31f32a71d29e647b648f81
+    groups:
+    - homekit
+  - name: find-my
+    repo-path: sdk-find-my
+    revision: 7fdf4606627ececece7f3865107e6cdaa052537d
+    groups:
+    - find-my
+  - name: sdk-lc3
+    revision: c47d9ee21c9cd8626a903c2e2f0c80c0920a1eb8
+    path: modules/lib/lc3
+    groups:
+    - nrf5340_audio
     # Other third-party repositories.
-    - name: cmock
-      path: test/cmock
-      revision: 9d092898ef26ece140d9225e037274b64d4f851e
-      remote: throwtheswitch
-    - name: unity
-      path: test/cmock/vendor/unity
-      revision: 74cde089e65c3435ce9aa87d5c69f4f16b7f6ade
-      remote: throwtheswitch
-    - name: Alexa-Gadgets-Embedded-Sample-Code
-      path: modules/alexa-embedded
-      revision: face92d8c62184832793f518bb1f19379538c5c1
-      remote: alexa
-    - name: zcbor
-      remote: nordicsemi
-      revision: 0.4.0
-      path: modules/lib/zcbor
-    - name: memfault-firmware-sdk
-      path: modules/lib/memfault-firmware-sdk
-      revision: 0.29.1
-      remote: memfault
-    - name: cirrus
-      repo-path: sdk-mcu-drivers
-      path: modules/hal/cirrus-logic
-      revision: 9f6b3812237fbb0d4157ba3584c13f1644fcbe3a
-      groups:
-      - nrf5340_audio
+  - name: cmock
+    path: test/cmock
+    revision: 9d092898ef26ece140d9225e037274b64d4f851e
+    remote: throwtheswitch
+  - name: unity
+    path: test/cmock/vendor/unity
+    revision: 74cde089e65c3435ce9aa87d5c69f4f16b7f6ade
+    remote: throwtheswitch
+  - name: Alexa-Gadgets-Embedded-Sample-Code
+    path: modules/alexa-embedded
+    revision: face92d8c62184832793f518bb1f19379538c5c1
+    remote: alexa
+  - name: zcbor
+    remote: nordicsemi
+    revision: 0.4.0
+    path: modules/lib/zcbor
+  - name: memfault-firmware-sdk
+    path: modules/lib/memfault-firmware-sdk
+    revision: 0.29.1
+    remote: memfault
+  - name: cirrus
+    repo-path: sdk-mcu-drivers
+    path: modules/hal/cirrus-logic
+    revision: 9f6b3812237fbb0d4157ba3584c13f1644fcbe3a
+    groups:
+    - nrf5340_audio
 
   # West-related configuration for the nrf repository.
   self:
