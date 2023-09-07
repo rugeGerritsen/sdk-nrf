@@ -144,3 +144,6 @@ config WATCHDOG
 
 config TASK_WDT
 	default y
+
+config BT_LOG_SNIFFER_INFO
+	default y
