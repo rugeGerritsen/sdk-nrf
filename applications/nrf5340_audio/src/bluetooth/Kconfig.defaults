@@ -8,7 +8,7 @@ config BT_AUDIO
 	default y
 
 config BT_DEVICE_NAME
-	default "NRF5340_AUDIO"
+	default "Nordic-stack1_AUDIO"
 
 config BT_ECC
 	default y if BT
@@ -17,7 +17,7 @@ config BT_EXT_ADV
 	default y
 
 config BT_DEVICE_NAME
-	default "NRF5340_AUDIO"
+	default "Nordic-stack1_AUDIO"
 
 # Mandatory to support at least 1 for ASCS
 config BT_ATT_PREPARE_COUNT
