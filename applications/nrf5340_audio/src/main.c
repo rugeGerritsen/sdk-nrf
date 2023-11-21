@@ -30,15 +30,15 @@ static struct board_version board_rev;
 
 static int hfclock_config_and_start(void)
 {
-	int ret;
+	// int ret;
 
 	/* Use this to turn on 128 MHz clock for cpu_app */
-	ret = nrfx_clock_divider_set(NRF_CLOCK_DOMAIN_HFCLK, NRF_CLOCK_HFCLK_DIV_1);
+	// ret = nrfx_clock_divider_set(NRF_CLOCK_DOMAIN_HFCLK, NRF_CLOCK_HFCLK_DIV_1);
 
-	ret -= NRFX_ERROR_BASE_NUM;
-	if (ret) {
-		return ret;
-	}
+	// ret -= NRFX_ERROR_BASE_NUM;
+	// if (ret) {
+	// 	return ret;
+	// }
 
 	nrfx_clock_hfclk_start();
 	while (!nrfx_clock_hfclk_is_running()) {

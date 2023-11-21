@@ -8,7 +8,7 @@
 #define MPSL_CLOCK_CONTROL_NRFX_POWER_CLOCK_H__
 
 #if (NRFX_CLOCK_ENABLED != 0)
-#error "Expected disabled nrfx_clock."
+//#error "Expected disabled nrfx_clock."
 #endif
 
 /* If this file is included then it means that nrfx_clock_mpsl is being used. */

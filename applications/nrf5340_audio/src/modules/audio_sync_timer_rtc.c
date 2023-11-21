@@ -9,7 +9,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/init.h>
 #include <nrfx_dppi.h>
-#include <nrfx_i2s.h>
+//#include <nrfx_i2s.h>
 #include <nrfx_ipc.h>
 #include <nrfx_rtc.h>
 #include <nrfx_timer.h>
@@ -153,7 +153,7 @@ static int audio_sync_timer_init(void)
 			AUDIO_RTC_TIMER_I2S_FRAME_START_EVT_CAPTURE,
 			dppi_channel_i2s_frame_start);
 
-	nrf_i2s_publish_set(NRF_I2S0, NRF_I2S_EVENT_FRAMESTART, dppi_channel_i2s_frame_start);
+	//nrf_i2s_publish_set(NRF_I2S0, NRF_I2S_EVENT_FRAMESTART, dppi_channel_i2s_frame_start);
 	ret = nrfx_dppi_channel_enable(dppi_channel_i2s_frame_start);
 	if (ret - NRFX_ERROR_BASE_NUM) {
 		LOG_ERR("nrfx DPPI channel enable error (I2S frame start): %d", ret);

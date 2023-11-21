@@ -22,10 +22,10 @@ struct power_rail_config {
 };
 
 static const struct power_rail_config rail_config[POWER_RAIL_NUM] = {
-	{"VBAT", DEVICE_DT_GET(DT_NODELABEL(vbat_sensor))},
-	{"VDD1_CODEC", DEVICE_DT_GET(DT_NODELABEL(vdd1_codec_sensor))},
-	{"VDD2_CODEC", DEVICE_DT_GET(DT_NODELABEL(vdd2_codec_sensor))},
-	{"VDD2_NRF", DEVICE_DT_GET(DT_NODELABEL(vdd2_nrf_sensor))},
+	// {"VBAT", DEVICE_DT_GET(DT_NODELABEL(vbat_sensor))},
+	// {"VDD1_CODEC", DEVICE_DT_GET(DT_NODELABEL(vdd1_codec_sensor))},
+	// {"VDD2_CODEC", DEVICE_DT_GET(DT_NODELABEL(vdd2_codec_sensor))},
+	// {"VDD2_NRF", DEVICE_DT_GET(DT_NODELABEL(vdd2_nrf_sensor))},
 };
 static bool rail_enabled[POWER_RAIL_NUM];
 

@@ -169,7 +169,7 @@ int audio_usb_disable(void)
 int audio_usb_init(void)
 {
 	int ret;
-	const struct device *hs_dev = DEVICE_DT_GET(DT_NODELABEL(hs_0));
+	const struct device *hs_dev = NULL; //DEVICE_DT_GET(DT_NODELABEL(hs_0));
 
 	if (!device_is_ready(hs_dev)) {
 		LOG_ERR("USB Headset Device not ready");

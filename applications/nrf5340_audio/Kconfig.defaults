@@ -82,8 +82,8 @@ config DATA_FIFO
 	default y
 
 # Enable NRFX_CLOCK for ACLK control
-config NRFX_CLOCK
-	default y
+# config NRFX_CLOCK
+# 	default y
 
 config I2C
 	default y
@@ -99,7 +99,7 @@ endchoice
 # across context switches to allow multiple threads to perform concurrent
 # floating point operations.
 config FPU
-	default y
+	default n
 
 config FPU_SHARING
 	default y

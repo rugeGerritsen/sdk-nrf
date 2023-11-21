@@ -17,10 +17,10 @@
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(board_version, CONFIG_BOARD_VERSION_LOG_LEVEL);
 
-#define BOARD_ID DT_NODELABEL(board_id)
+#define BOARD_ID 0
 
-static const struct adc_dt_spec adc = ADC_DT_SPEC_GET(BOARD_ID);
-static const struct gpio_dt_spec power_gpios = GPIO_DT_SPEC_GET(BOARD_ID, power_gpios);
+//static const struct adc_dt_spec adc = ADC_DT_SPEC_GET(BOARD_ID);
+//static const struct gpio_dt_spec power_gpios = GPIO_DT_SPEC_GET(BOARD_ID, power_gpios);
 
 /* We allow the ADC register value to deviate by N points in either direction */
 #define BOARD_VERSION_TOLERANCE	  70
@@ -38,20 +38,20 @@ static int divider_value_get(void)
 {
 	int ret;
 
-	ret = gpio_pin_set_dt(&power_gpios, 1);
-	if (ret) {
-		return ret;
-	}
+	// ret = gpio_pin_set_dt(&power_gpios, 1);
+	// if (ret) {
+	// 	return ret;
+	// }
 
 	/* Wait for voltage to stabilize */
 	k_busy_wait(VOLTAGE_STABILIZE_TIME_US);
 
-	ret = adc_read(adc.dev, &sequence);
+	ret = adc_read(NULL, &sequence);
 	if (ret) {
 		return ret;
 	}
 
-	ret = gpio_pin_set_dt(&power_gpios, 0);
+	ret = gpio_pin_set_dt(NULL, 0);
 	if (ret) {
 		return ret;
 	}
@@ -97,26 +97,26 @@ static int board_version_init(void)
 		return 0;
 	}
 
-	if (!gpio_is_ready_dt(&power_gpios)) {
+	if (!gpio_is_ready_dt(NULL)) {
 		return -ENXIO;
 	}
 
-	ret = gpio_pin_configure_dt(&power_gpios, GPIO_OUTPUT_INACTIVE);
+	ret = gpio_pin_configure_dt(NULL, GPIO_OUTPUT_INACTIVE);
 	if (ret) {
 		return ret;
 	}
 
-	if (!device_is_ready(adc.dev)) {
+	if (!device_is_ready(NULL)) {
 		LOG_ERR("ADC not ready");
 		return -ENODEV;
 	}
 
-	ret = adc_channel_setup_dt(&adc);
+	ret = adc_channel_setup_dt(NULL);
 	if (ret) {
 		return ret;
 	}
 
-	(void)adc_sequence_init_dt(&adc, &sequence);
+	(void)adc_sequence_init_dt(NULL, &sequence);
 
 	initialized = true;
 	return 0;
