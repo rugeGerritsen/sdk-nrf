@@ -46,6 +46,7 @@ typedef void (*bt_conn_evt_prepare_cb_t)(const struct bt_conn *conn,
  *
  * @param[in] conn                The connection context.
  * @param[in] cb                  The callback to be used.
+ * @param[in] user_data           User data which will be provided in the callback.
  * @param[in] prepare_distance_us The distance in time from the start of the
  *                                callback to the start of the connection event.
  */
@@ -53,10 +54,6 @@ int bt_conn_evt_prepare_cb_set(const struct bt_conn *conn,
 			       bt_conn_evt_prepare_cb_t cb,
 			       void *user_data,
 			       uint32_t prepare_distance_us);
-
-/**
- * @}
- */
 
 #ifdef __cplusplus
 }
