@@ -19,7 +19,14 @@
 #include <hal/nrf_egu.h>
 #endif
 
+#if defined(CONFIG_SOC_SERIES_NRF54LX)
+#define EGU_INST NRF_EGU10
+const nrfx_gpiote_t gpiote = NRFX_GPIOTE_INSTANCE(30);
+#else
+#define EGU_INST NRF_EGU0
 const nrfx_gpiote_t gpiote = NRFX_GPIOTE_INSTANCE(0);
+#endif
+
 LOG_MODULE_REGISTER(mpsl_radio_pin_debug, CONFIG_MPSL_LOG_LEVEL);
 
 static int m_ppi_config(void)
@@ -89,7 +96,7 @@ static int m_ppi_config(void)
 		return -ENOMEM;
 	}
 
-#elif defined(DPPI_PRESENT)
+#elif defined(DPPIC_PRESENT) && !defined(PPIB_PRESENT)
 	/* Radio events are published on predefined channels.
 	 */
 	uint8_t ppi_chan_radio_ready = MPSL_DPPI_RADIO_PUBLISH_READY_CHANNEL_IDX;
@@ -112,15 +119,15 @@ static int m_ppi_config(void)
 		LOG_ERR("Failed allocating DPPI chan");
 		return -ENOMEM;
 	}
-	nrf_egu_subscribe_set(NRF_EGU0, NRF_EGU_TASK_TRIGGER0, ppi_chan_radio_ready);
-	nrf_egu_subscribe_set(NRF_EGU0, NRF_EGU_TASK_TRIGGER1, ppi_chan_radio_disabled);
-	nrf_egu_subscribe_set(NRF_EGU0, NRF_EGU_TASK_TRIGGER2, ppi_chan_radio_address);
-	nrf_egu_subscribe_set(NRF_EGU0, NRF_EGU_TASK_TRIGGER3, ppi_chan_radio_end);
+	nrf_egu_subscribe_set(EGU_INST, NRF_EGU_TASK_TRIGGER0, ppi_chan_radio_ready);
+	nrf_egu_subscribe_set(EGU_INST, NRF_EGU_TASK_TRIGGER1, ppi_chan_radio_disabled);
+	nrf_egu_subscribe_set(EGU_INST, NRF_EGU_TASK_TRIGGER2, ppi_chan_radio_address);
+	nrf_egu_subscribe_set(EGU_INST, NRF_EGU_TASK_TRIGGER3, ppi_chan_radio_end);
 
-	nrf_egu_publish_set(NRF_EGU0, NRF_EGU_EVENT_TRIGGERED0, dppi_chan_ready_disabled);
-	nrf_egu_publish_set(NRF_EGU0, NRF_EGU_EVENT_TRIGGERED1, dppi_chan_ready_disabled);
-	nrf_egu_publish_set(NRF_EGU0, NRF_EGU_EVENT_TRIGGERED2, dppi_chan_address_end);
-	nrf_egu_publish_set(NRF_EGU0, NRF_EGU_EVENT_TRIGGERED3, dppi_chan_address_end);
+	nrf_egu_publish_set(EGU_INST, NRF_EGU_EVENT_TRIGGERED0, dppi_chan_ready_disabled);
+	nrf_egu_publish_set(EGU_INST, NRF_EGU_EVENT_TRIGGERED1, dppi_chan_ready_disabled);
+	nrf_egu_publish_set(EGU_INST, NRF_EGU_EVENT_TRIGGERED2, dppi_chan_address_end);
+	nrf_egu_publish_set(EGU_INST, NRF_EGU_EVENT_TRIGGERED3, dppi_chan_address_end);
 
 	nrfx_gppi_task_endpoint_setup(
 		dppi_chan_ready_disabled,
@@ -141,6 +148,79 @@ static int m_ppi_config(void)
 		LOG_ERR("Failed enabling channel");
 		return -ENOMEM;
 	}
+#elif defined(DPPIC_PRESENT) && defined(PPIB_PRESENT)
+	/* Radio events are published on predefined channels.
+	 */
+	uint8_t ppi_chan_radio_ready = MPSL_DPPI_RADIO_PUBLISH_READY_CHANNEL_IDX;
+	uint8_t ppi_chan_radio_address = MPSL_DPPI_RADIO_PUBLISH_ADDRESS_CHANNEL_IDX;
+	uint8_t ppi_chan_radio_end = MPSL_DPPI_RADIO_PUBLISH_END_CHANNEL_IDX;
+	uint8_t ppi_chan_radio_disabled = MPSL_DPPI_RADIO_PUBLISH_DISABLED_CH_IDX;
+
+	/* When there are multiple domains involved, we need to use a single
+	 * publish event as input to nrfx_gppi_channel_endpoints_setup in order ensure bridges
+	 * are properly setup.
+	 * 
+	 * This is done in two steps: 
+	 * 1. Combine the channels used for READY and DISABLED into a single channel
+	 *    by making the EGU subscribe to both of these using two EGU channels.
+	 *    These two are combined to publish to a dppi_chan_ready_disabled
+	 * 2. Use another EGU channel to subscribe to these so that we now
+	 *    have a single EGU channel that is published to when READY or DISABLED occurs.
+	 */
+	uint8_t dppi_chan_ready_disabled;
+	uint8_t dppi_chan_address_end;
+	uint8_t dppi_chan_ready_disabled_to_gpiote;
+	uint8_t dppi_chan_address_end_to_gpiote;
+
+	if (nrfx_gppi_channel_alloc(&dppi_chan_ready_disabled) != NRFX_SUCCESS) {
+		LOG_ERR("Failed allocating DPPI chan");
+		return -ENOMEM;
+	}
+
+	if (nrfx_gppi_channel_alloc(&dppi_chan_address_end) != NRFX_SUCCESS) {
+		LOG_ERR("Failed allocating DPPI chan");
+		return -ENOMEM;
+	}
+
+	if (nrfx_gppi_channel_alloc(&dppi_chan_ready_disabled_to_gpiote) != NRFX_SUCCESS) {
+		LOG_ERR("Failed allocating DPPI chan");
+		return -ENOMEM;
+	}
+
+	if (nrfx_gppi_channel_alloc(&dppi_chan_address_end_to_gpiote) != NRFX_SUCCESS) {
+		LOG_ERR("Failed allocating DPPI chan");
+		return -ENOMEM;
+	}
+
+	nrf_egu_subscribe_set(EGU_INST, NRF_EGU_TASK_TRIGGER0, ppi_chan_radio_ready);
+	nrf_egu_subscribe_set(EGU_INST, NRF_EGU_TASK_TRIGGER1, ppi_chan_radio_disabled);
+	nrf_egu_subscribe_set(EGU_INST, NRF_EGU_TASK_TRIGGER2, ppi_chan_radio_address);
+	nrf_egu_subscribe_set(EGU_INST, NRF_EGU_TASK_TRIGGER3, ppi_chan_radio_end);
+
+	nrf_egu_publish_set(EGU_INST, NRF_EGU_EVENT_TRIGGERED0, dppi_chan_ready_disabled);
+	nrf_egu_publish_set(EGU_INST, NRF_EGU_EVENT_TRIGGERED1, dppi_chan_ready_disabled);
+	nrf_egu_publish_set(EGU_INST, NRF_EGU_EVENT_TRIGGERED2, dppi_chan_address_end);
+	nrf_egu_publish_set(EGU_INST, NRF_EGU_EVENT_TRIGGERED3, dppi_chan_address_end);
+
+	nrfx_gppi_channels_enable(1UL << dppi_chan_ready_disabled | 1UL << dppi_chan_address_end);
+
+	nrf_egu_subscribe_set(EGU_INST, NRF_EGU_TASK_TRIGGER4, dppi_chan_ready_disabled);
+	nrf_egu_subscribe_set(EGU_INST, NRF_EGU_TASK_TRIGGER5, dppi_chan_address_end);
+
+	nrfx_gppi_channel_endpoints_setup(
+		dppi_chan_ready_disabled_to_gpiote,
+		nrf_egu_event_address_get(EGU_INST, NRF_EGU_EVENT_TRIGGERED4),
+		nrfx_gpiote_out_task_address_get(
+			&gpiote, CONFIG_MPSL_PIN_DEBUG_RADIO_READY_AND_DISABLED_PIN));
+
+	nrfx_gppi_channel_endpoints_setup(
+		dppi_chan_address_end_to_gpiote,
+		nrf_egu_event_address_get(EGU_INST, NRF_EGU_EVENT_TRIGGERED5),
+		nrfx_gpiote_out_task_address_get(
+			&gpiote, CONFIG_MPSL_PIN_DEBUG_RADIO_ADDRESS_AND_END_PIN));
+	
+	nrfx_gppi_channels_enable(1UL << dppi_chan_ready_disabled_to_gpiote | 
+						      1UL << dppi_chan_address_end_to_gpiote);
 #else
 #error "Expect either PPI or DPPI to be present."
 #endif
