@@ -74,15 +74,17 @@ static void start_connectable_advertiser(struct k_work *work)
 
 static int setup_advertiser(uint8_t id_adv)
 {
+	uint32_t adv_interval_min_ms = 400;
+	uint32_t adv_interval_max_ms = 400;
 	struct bt_le_adv_param adv_param =
 		BT_LE_ADV_PARAM_INIT(BT_LE_ADV_OPT_CONNECTABLE,
-				     BT_GAP_ADV_SLOW_INT_MIN,
-				     BT_GAP_ADV_SLOW_INT_MAX,
+				     adv_interval_min_ms,
+				     adv_interval_max_ms,
 				     NULL);
-	
+
 	size_t id_count = 0xFF;
 	int err;
-	
+
 	bt_id_get(NULL, &id_count);
 	if (id_adv == id_count) {
 		int id;
@@ -102,7 +104,7 @@ static int setup_advertiser(uint8_t id_adv)
 	printk("Using current id: %u\n", id_adv);
 	adv_param.id = id_adv;
 	advertisers[id_adv].id = id_adv;
-	
+
 	err = bt_le_ext_adv_create(&adv_param, NULL, &advertisers[id_adv].adv);
 	if (err) {
 		printk("Failed to create advertiser set (err %d)\n", err);
@@ -136,7 +138,7 @@ int main(void)
 	}
 
 	printk("Bluetooth initialized\n");
-	
+
 	printk("Starting %d advertisers\n", CONFIG_BT_EXT_ADV_MAX_ADV_SET);
 	for (uint8_t i = 0; i < CONFIG_BT_EXT_ADV_MAX_ADV_SET; i++)
 	{
